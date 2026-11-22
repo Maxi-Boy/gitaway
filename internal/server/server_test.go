@@ -56,6 +56,10 @@ func newEnv(t *testing.T) *testEnv {
 	if err != nil {
 		t.Fatal(err)
 	}
+	settings, err := store.OpenSettings(filepath.Join(t.TempDir(), "settings.json"), store.DefaultSettings(""))
+	if err != nil {
+		t.Fatal(err)
+	}
 	ta, err := auth.NewTokenAuth()
 	if err != nil {
 		t.Fatal(err)
@@ -63,7 +67,7 @@ func newEnv(t *testing.T) *testEnv {
 	cfg := config.Default()
 	cfg.SessionTTL = config.Duration{Duration: time.Hour}
 	srv := New(Deps{
-		Cfg: cfg, Auth: ta, Sandbox: sb, Repos: repos, Git: gitx.NewRunner(),
+		Cfg: cfg, Auth: ta, Sandbox: sb, Repos: repos, Settings: settings, Git: gitx.NewRunner(),
 		Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
 	ts := httptest.NewServer(srv.Handler())

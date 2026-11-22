@@ -59,6 +59,11 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	settings, err := store.OpenSettings(filepath.Join(cfg.DataDir, "settings.json"),
+		store.DefaultSettings(cfg.DefaultFolder))
+	if err != nil {
+		return err
+	}
 
 	var authn auth.Authenticator
 	switch cfg.AuthMode {
@@ -81,13 +86,14 @@ func run() error {
 	}
 
 	srv := server.New(server.Deps{
-		Cfg:     cfg,
-		Auth:    authn,
-		Sandbox: sandbox,
-		Repos:   repos,
-		Git:     gitx.NewRunner(),
-		Log:     log,
-		Web:     web.FS,
+		Cfg:      cfg,
+		Auth:     authn,
+		Sandbox:  sandbox,
+		Repos:    repos,
+		Settings: settings,
+		Git:      gitx.NewRunner(),
+		Log:      log,
+		Web:      web.FS,
 	})
 	httpSrv := &http.Server{
 		Addr:              cfg.Listen,

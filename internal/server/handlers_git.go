@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -211,41 +210,16 @@ func (s *Server) handleTree(w http.ResponseWriter, r *http.Request, _ auth.Sessi
 	if err != nil {
 		return err
 	}
-	items, err := os.ReadDir(full)
+	entries, truncated, err := listDir(full, maxListEntries)
 	if err != nil {
 		return err
 	}
-	relSlash := filepath.ToSlash(filepath.Clean(rel))
-	if relSlash == "." {
-		relSlash = ""
-	}
+	relSlash := cleanRel(rel)
 	marks := s.statusMarks(r.Context(), dir, relSlash)
-
-	entries := make([]treeEntry, 0, len(items))
-	for _, it := range items {
-		if it.Name() == ".git" {
-			continue
-		}
-		info, err := it.Info()
-		if err != nil {
-			continue // файл исчез между чтением каталога и stat
-		}
-		entries = append(entries, treeEntry{
-			Name:    it.Name(),
-			IsDir:   it.IsDir(),
-			Symlink: it.Type()&fs.ModeSymlink != 0,
-			Size:    info.Size(),
-			MTime:   info.ModTime().Unix(),
-			Status:  marks[it.Name()],
-		})
+	for i := range entries {
+		entries[i].Status = marks[entries[i].Name]
 	}
-	sort.Slice(entries, func(i, j int) bool {
-		if entries[i].IsDir != entries[j].IsDir {
-			return entries[i].IsDir
-		}
-		return strings.ToLower(entries[i].Name) < strings.ToLower(entries[j].Name)
-	})
-	writeJSON(w, http.StatusOK, map[string]any{"path": relSlash, "entries": entries})
+	writeJSON(w, http.StatusOK, map[string]any{"path": relSlash, "entries": entries, "truncated": truncated})
 	return nil
 }
 

@@ -50,15 +50,7 @@ func Open(path string) (*Repos, error) {
 }
 
 func (s *Repos) save() error {
-	data, err := json.MarshalIndent(s.list, "", "  ")
-	if err != nil {
-		return err
-	}
-	tmp := s.path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, s.path)
+	return writeJSONFile(s.path, s.list)
 }
 
 // List возвращает копию списка.

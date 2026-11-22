@@ -22,13 +22,14 @@ import (
 
 // Deps это зависимости сервера.
 type Deps struct {
-	Cfg     config.Config
-	Auth    auth.Authenticator
-	Sandbox *fsx.Sandbox
-	Repos   *store.Repos
-	Git     *gitx.Runner
-	Log     *slog.Logger
-	Web     fs.FS // статический интерфейс для "/" (может быть nil)
+	Cfg      config.Config
+	Auth     auth.Authenticator
+	Sandbox  *fsx.Sandbox
+	Repos    *store.Repos
+	Settings *store.SettingsStore
+	Git      *gitx.Runner
+	Log      *slog.Logger
+	Web      fs.FS // статический интерфейс для "/" (может быть nil)
 }
 
 // Server обслуживает API и статические файлы.
@@ -37,6 +38,7 @@ type Server struct {
 	auth     auth.Authenticator
 	sandbox  *fsx.Sandbox
 	repos    *store.Repos
+	settings *store.SettingsStore
 	git      *gitx.Runner
 	log      *slog.Logger
 	web      fs.FS
@@ -56,6 +58,7 @@ func New(d Deps) *Server {
 		auth:     d.Auth,
 		sandbox:  d.Sandbox,
 		repos:    d.Repos,
+		settings: d.Settings,
 		git:      d.Git,
 		log:      log,
 		web:      d.Web,
@@ -82,6 +85,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/file", s.api(s.handleFile))
 	mux.HandleFunc("/api/copy/plan", s.api(s.handleCopyPlan))
 	mux.HandleFunc("/api/copy", s.api(s.handleCopy))
+	mux.HandleFunc("/api/fs", s.api(s.handleFS))
+	mux.HandleFunc("/api/fs/mkdir", s.api(s.handleMkdir))
+	mux.HandleFunc("/api/settings", s.api(s.handleSettings))
 	s.registerGit(mux)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "unknown API endpoint")

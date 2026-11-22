@@ -87,7 +87,7 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request, sess auth.Sess
 		"user":           sess.User,
 		"csrf":           sess.CSRF,
 		"roots":          s.sandbox.Roots(),
-		"default_folder": s.cfg.DefaultFolder,
+		"default_folder": s.settings.Get().DefaultFolder,
 	})
 	return nil
 }

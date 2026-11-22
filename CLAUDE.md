@@ -35,7 +35,7 @@ CI (`.github/workflows/ci.yml`) на каждый push: build, vet, test -race, 
     internal/gitx/     обёртка над системным git (os/exec): ветки, статус, worktree,
                        операции, последний коммит по элементам каталога (+ кэш по HEAD)
     internal/auth/     Authenticator (token сейчас, PAM потом), сессии, лимит попыток
-    internal/store/    repos.json (0600, атомарная запись)
+    internal/store/    repos.json и settings.json (0600, атомарная запись)
     internal/jobs/     KeyedLock: одна операция на репозиторий или каталог
     internal/copyop/   копирование между панелями: план -> решения -> атомарная запись
     internal/server/   HTTP API, middleware, обработчики
