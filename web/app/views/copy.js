@@ -1,6 +1,6 @@
 // Копирование из ветки в папку сервера: план, диалог конфликтов, выполнение.
 // Сравниваются размер, дата изменения, дата создания и дата коммита источника.
-import { h, dialog, toast, size, fullStamp } from '../ui.js';
+import { h, mount, dialog, toast, size, stamp, fullStamp } from '../ui.js';
 import { t } from '../i18n.js';
 import { api } from '../api.js';
 import { state, bus, emit, wtParam, addLog } from '../store.js';
@@ -44,7 +44,7 @@ export async function runCopy(req) {
   if (plan.conflicts?.length) {
     if (state.settings && !state.settings.ask_on_overwrite) policy = 'replace_all';
     else {
-      const res = await conflictDialog(plan, req.move);
+      const res = await conflictDialog(plan, req);
       if (!res) return;
       decisions = res;
     }
@@ -71,57 +71,73 @@ export async function runCopy(req) {
   emit('changed');
 }
 
-// conflictDialog возвращает решения {rel: action} или null при отмене.
-function conflictDialog(plan, move) {
+// conflictDialog показывает конфликты по одному, как в макете: сравнение «ветка ↔ сервер»
+// по размеру и датам, решение для этого файла или сразу для всех оставшихся.
+// Возвращает решения {rel: action} или null при отмене.
+function conflictDialog(plan, req) {
   return new Promise((resolve) => {
-    const selects = [];
-    const meta = (label, value, mark) => h('div', { class: 'meta' }, label + ': ', h('b', { class: mark ? 'newer' : null }, value));
-    const rows = plan.conflicts.map((c) => {
-      const sel = h('select', { 'aria-label': t('copy.decisionFor', { path: c.rel }) },
-        h('option', { value: 'replace' }, t('copy.replace')),
-        h('option', { value: 'skip' }, t('copy.skip')),
-        h('option', { value: 'keep_both' }, t('copy.keepBoth')));
-      sel.value = c.same_file ? 'skip' : 'replace';
-      selects.push({ sel, c });
-      return [
-        h('div', {}, h('div', { class: 'ellipsis mono', title: c.rel }, c.rel),
-          c.same_file ? h('div', { class: 'meta' }, t('copy.sameFile')) : null,
-          h('div', { class: 'meta' }, c.newer === 'src' ? t('copy.srcNewer') : c.newer === 'dst' ? t('copy.dstNewer') : t('copy.sameTime'))),
-        h('div', { class: 'wide-only' },
-          meta(t('copy.size'), size(c.src.size)),
-          meta(t('copy.mtime'), fullStamp(c.src.mtime), c.newer === 'src'),
-          meta(t('copy.birth'), fullStamp(c.src.birth)),
-          c.src_commit_time ? meta(t('copy.commit'), fullStamp(c.src_commit_time)) : null),
-        h('div', { class: 'wide-only' },
-          meta(t('copy.size'), size(c.dst.size)),
-          meta(t('copy.mtime'), fullStamp(c.dst.mtime), c.newer === 'dst'),
-          meta(t('copy.birth'), fullStamp(c.dst.birth))),
-        h('div', {}, sel),
-      ];
+    const list = plan.conflicts;
+    const decisions = {};
+    let i = 0;
+    const box = h('div', {});
+    const where = t('copy.where', {
+      src: state.wt ? (state.wt.branch || state.wt.path.split('/').pop()) : '',
+      dst: req.dst.dir + (req.dst.path ? '/' + req.dst.path : ''),
     });
-    const setAll = (fn) => () => { for (const s of selects) s.sel.value = fn(s.c); };
-    const body = [
-      h('p', {}, t('copy.conflictsIntro', { n: plan.conflicts.length, total: plan.files.length })),
-      plan.blocked?.length ? h('p', { class: 'muted' }, t('copy.blockedNote', { n: plan.blocked.length })) : null,
-      h('div', { class: 'field', style: { flexWrap: 'wrap', marginBottom: '10px' } },
-        h('button', { class: 'btn small', onclick: setAll(() => 'replace') }, t('copy.replaceAll')),
-        h('button', { class: 'btn small', onclick: setAll((c) => (c.newer === 'src' ? 'replace' : 'skip')) }, t('copy.replaceNewer')),
-        h('button', { class: 'btn small', onclick: setAll(() => 'skip') }, t('copy.skipAll')),
-        h('button', { class: 'btn small', onclick: setAll(() => 'keep_both') }, t('copy.keepBothAll'))),
-      h('div', { class: 'conf' },
-        h('div', { class: 'hd' }, t('copy.file')), h('div', { class: 'hd wide-only' }, t('copy.source')),
-        h('div', { class: 'hd wide-only' }, t('copy.target')), h('div', { class: 'hd' }, t('copy.action')),
-        rows),
-    ];
-    dialog({
-      title: move ? t('copy.titleMove') : t('copy.titleCopy'), wide: true, body,
-      buttons: [{ label: t('common.cancel'), value: null },
-        { label: move ? t('copy.runMove') : t('copy.runCopy'), primary: true, run: (close) => {
-          const d = {};
-          for (const s of selects) d[s.c.rel] = s.sel.value;
-          close(d);
-        } }],
+    let d = null;
+
+    const finish = () => d.close(decisions);
+    const decide = (action) => {
+      decisions[list[i].rel] = action;
+      if (++i >= list.length) finish();
+      else render();
+    };
+    const decideRest = (fn) => {
+      for (let k = i; k < list.length; k++) decisions[list[k].rel] = fn(list[k]);
+      finish();
+    };
+
+    const render = () => {
+      const c = list[i];
+      const newer = (side) => (c.newer === side ? h('span', { class: 'newer' }, ' · ' + t('copy.newer')) : null);
+      const row = (label, a, b) => [h('span', { class: 'muted' }, label), h('span', {}, a), h('span', {}, b)];
+      const when = (unix) => h('span', { title: fullStamp(unix) }, stamp(unix));
+      const noBirth = !c.src.birth || !c.dst.birth;
+      const left = list.length - i;
+      mount(box,
+        h('div', { class: 'muted cmp-sub' },
+          h('b', { class: 'mono', style: { color: 'var(--text)' } }, c.rel), ' · ',
+          t('copy.nOfM', { i: i + 1, n: list.length }), ' · ', where),
+        c.same_file ? h('p', { class: 'notice' }, t('copy.sameFile')) : null,
+        h('div', { class: 'cmp' },
+          h('span', {}), h('span', { class: 'hd' }, t('copy.source')), h('span', { class: 'hd' }, t('copy.target')),
+          row(t('copy.size'), size(c.src.size), size(c.dst.size)),
+          row(t('copy.mtime'), [when(c.src.mtime), newer('src')], [when(c.dst.mtime), newer('dst')]),
+          row(t('copy.birth'), when(c.src.birth), when(c.dst.birth)),
+          row(t('copy.commit'), when(c.src_commit_time), h('span', { class: 'muted' }, '—'))),
+        noBirth ? h('p', { class: 'muted cmp-note' }, t('copy.birthNote')) : null,
+        plan.blocked?.length && i === 0 ? h('p', { class: 'muted cmp-note' }, t('copy.blockedNote', { n: plan.blocked.length })) : null,
+        h('div', { class: 'cmp-acts' },
+          h('button', { class: 'btn primary', onclick: () => decide('replace') }, t('copy.replace')),
+          h('button', { class: 'btn', onclick: () => decide('skip') }, t('copy.skip')),
+          h('button', { class: 'btn', onclick: () => decide('keep_both') }, t('copy.keepBoth')),
+          h('span', { class: 'grow' }),
+          i > 0 ? h('button', { class: 'btn', onclick: () => { i--; render(); } }, t('copy.back')) : null,
+          h('button', { class: 'btn', onclick: () => d.close(null) }, t('common.cancel'))),
+        left > 1 ? h('div', { class: 'cmp-all' },
+          h('div', { class: 'muted' }, t('copy.forRest', { n: left })),
+          h('div', { class: 'cmp-acts' },
+            h('button', { class: 'btn', onclick: () => decideRest(() => 'replace') }, t('copy.replaceAll')),
+            h('button', { class: 'btn', onclick: () => decideRest((x) => (x.newer === 'src' ? 'replace' : 'skip')) }, t('copy.replaceNewer')),
+            h('button', { class: 'btn', onclick: () => decideRest(() => 'skip') }, t('copy.skipAll')),
+            h('button', { class: 'btn', onclick: () => decideRest(() => 'keep_both') }, t('copy.keepBothAll')))) : null);
+      box.querySelector('.btn.primary')?.focus();
+    };
+
+    d = dialog({
+      title: req.move ? t('copy.titleMove') : t('copy.titleCopy'), body: box, mid: true,
       onClose: (v) => resolve(v && typeof v === 'object' ? v : null),
     });
+    render();
   });
 }

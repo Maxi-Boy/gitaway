@@ -63,15 +63,24 @@ require('fs').mkdirSync(OUT, { recursive: true });
   await page.screenshot({ path: OUT + '/3-fs-settings.png' });
   await page.click('.right button[aria-label="Настройки локальной ФС"]');
 
-  await step('drag file to server: conflict dialog', async () => {
+  await step('drag two files to server: first conflict', async () => {
+    await page.click('.center .row:has-text("README.md")');
+    await page.click('.center .row:has-text("server.go")', { modifiers: ['Control'] });
     await page.dragAndDrop('.center .row:has-text("server.go")', '.right .dropzone');
-    await page.waitForSelector('.dialog:has-text("уже существуют")');
+    await page.waitForSelector('.dialog:has-text("конфликт 1 из 2")');
+    await page.waitForSelector('.dialog .newer');
+    await page.waitForSelector('.dialog:has-text("Для всех оставшихся конфликтов (2)")');
   });
   await page.screenshot({ path: OUT + '/4-conflict.png' });
-  await step('keep both and run', async () => {
-    await page.click('.dialog button:has-text("Оставить оба для всех")');
-    await page.click('.dialog footer button:has-text("Копировать")');
+  await step('step through: replace, back, replace, keep both', async () => {
+    await page.click('.dialog button:has-text("Заменить")');
+    await page.waitForSelector('.dialog:has-text("конфликт 2 из 2")');
+    await page.click('.dialog button:has-text("Назад")');
+    await page.waitForSelector('.dialog:has-text("конфликт 1 из 2")');
+    await page.click('.dialog button:text-is("Заменить")');
+    await page.click('.dialog button:text-is("Оставить оба")');
     await page.waitForSelector('.right .row:has-text("server.go (2)")');
+    await page.waitForSelector('.dock .log-entry:has-text("заменён: README.md")');
   });
 
   await step('changes view: stage, diff, commit', async () => {

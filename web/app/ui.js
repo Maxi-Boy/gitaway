@@ -129,7 +129,7 @@ export function onContext(el, getItems) {
 // --- диалоги ---
 
 // dialog открывает модальное окно. Возвращает {close, el}. onClose вызывается один раз.
-export function dialog({ title, body, buttons = [], wide = false, onClose }) {
+export function dialog({ title, body, buttons = [], wide = false, mid = false, onClose }) {
   const prev = document.activeElement;
   let closed = false;
   const close = (value) => {
@@ -144,7 +144,7 @@ export function dialog({ title, body, buttons = [], wide = false, onClose }) {
     class: 'btn' + (b.primary ? ' primary' : '') + (b.danger ? ' danger' : ''),
     onclick: () => b.run ? b.run(close) : close(b.value),
   }, b.label));
-  const box = h('div', { class: 'dialog' + (wide ? ' wide' : ''), role: 'dialog', 'aria-modal': 'true', 'aria-label': title },
+  const box = h('div', { class: 'dialog' + (wide ? ' wide' : mid ? ' mid' : ''), role: 'dialog', 'aria-modal': 'true', 'aria-label': title },
     h('header', {}, title), h('div', { class: 'body' }, body), foot.length ? h('footer', {}, foot) : null);
   const overlay = h('div', { class: 'overlay', onpointerdown: (e) => { if (e.target === overlay) close(); } }, box);
   const onKey = (e) => {
