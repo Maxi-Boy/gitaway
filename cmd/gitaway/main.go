@@ -83,6 +83,15 @@ func run() error {
 	if !cfg.IsLoopback() {
 		log.Warn("сервер слушает не на loopback: нужен TLS (например, nginx) и ограничение доступа по сети",
 			"listen", cfg.Listen)
+		if len(cfg.AllowCIDRs) == 0 {
+			log.Warn("allow_cidrs не задан: подключиться можно с любого адреса")
+		}
+	}
+	if len(cfg.AllowCIDRs) > 0 {
+		log.Info("доступ разрешён только из сетей", "allow_cidrs", cfg.AllowCIDRs)
+		if cfg.IsLoopback() && !cfg.TrustProxy {
+			log.Warn("allow_cidrs без trust_proxy: за nginx все запросы приходят с 127.0.0.1 и проверка ничего не ограничит")
+		}
 	}
 
 	srv := server.New(server.Deps{

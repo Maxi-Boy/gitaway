@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"time"
 
@@ -46,12 +47,20 @@ type Server struct {
 	limiter  *auth.Limiter
 	locks    *jobs.KeyedLock
 	commits  *gitx.CommitCache
+	allow    []netip.Prefix
+	allowAll bool
 }
 
 func New(d Deps) *Server {
 	log := d.Log
 	if log == nil {
 		log = slog.Default()
+	}
+	allow, err := config.ParseCIDRs(d.Cfg.AllowCIDRs)
+	if err != nil {
+		// Normalize уже проверил список; если всё же ошибка, пускаем только loopback
+		log.Error("allow_cidrs", "err", err)
+		allow = nil
 	}
 	return &Server{
 		cfg:      d.Cfg,
@@ -66,6 +75,8 @@ func New(d Deps) *Server {
 		limiter:  auth.NewLimiter(5, 5*time.Minute),
 		locks:    &jobs.KeyedLock{},
 		commits:  gitx.NewCommitCache(),
+		allow:    allow,
+		allowAll: len(d.Cfg.AllowCIDRs) == 0,
 	}
 }
 
@@ -97,7 +108,7 @@ func (s *Server) Handler() http.Handler {
 	if s.web != nil {
 		mux.Handle("/", http.FileServer(http.FS(s.web)))
 	}
-	return s.withHeaders(s.withLog(mux))
+	return s.withHeaders(s.withLog(s.withAllow(mux)))
 }
 
 // apiHandler это обработчик, которому уже известна сессия; ошибка превращается в JSON-ответ.
@@ -155,17 +166,60 @@ func (s *Server) isHTTPS(r *http.Request) bool {
 	return r.TLS != nil || (s.cfg.TrustProxy && r.Header.Get("X-Forwarded-Proto") == "https")
 }
 
+// clientIP возвращает адрес клиента. X-Real-IP учитывается, только если включён
+// trust_proxy и запрос пришёл с loopback (от nginx на той же машине): иначе
+// заголовок мог бы подделать кто угодно.
 func (s *Server) clientIP(r *http.Request) string {
-	if s.cfg.TrustProxy {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
+	}
+	if s.cfg.TrustProxy && isLoopback(host) {
 		if ip := r.Header.Get("X-Real-IP"); ip != "" {
 			return ip
 		}
 	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
 	return host
+}
+
+func isLoopback(ip string) bool {
+	a, err := netip.ParseAddr(ip)
+	return err == nil && a.Unmap().IsLoopback()
+}
+
+// allowed проверяет адрес клиента по allow_cidrs. Loopback разрешён всегда:
+// с той же машины и так есть доступ к файлам.
+func (s *Server) allowed(ip string) bool {
+	if s.allowAll {
+		return true
+	}
+	a, err := netip.ParseAddr(ip)
+	if err != nil {
+		return false
+	}
+	a = a.Unmap() // ::ffff:10.0.0.1 это 10.0.0.1
+	if a.IsLoopback() {
+		return true
+	}
+	for _, p := range s.allow {
+		if p.Contains(a) {
+			return true
+		}
+	}
+	return false
+}
+
+// withAllow отклоняет запросы с адресов вне allow_cidrs до любой другой обработки,
+// включая страницу входа.
+func (s *Server) withAllow(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if ip := s.clientIP(r); !s.allowed(ip) {
+			s.log.Warn("address not allowed", "ip", ip)
+			writeError(w, http.StatusForbidden, "address_not_allowed", "access from this address is not allowed")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) withHeaders(next http.Handler) http.Handler {

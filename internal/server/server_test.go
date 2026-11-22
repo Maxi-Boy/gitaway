@@ -30,7 +30,8 @@ type testEnv struct {
 	csrf  string
 }
 
-func newEnv(t *testing.T) *testEnv {
+// newEnv поднимает сервер с тестовым окружением git; opts меняют конфигурацию.
+func newEnv(t *testing.T, opts ...func(*config.Config)) *testEnv {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git is not installed")
@@ -66,6 +67,9 @@ func newEnv(t *testing.T) *testEnv {
 	}
 	cfg := config.Default()
 	cfg.SessionTTL = config.Duration{Duration: time.Hour}
+	for _, o := range opts {
+		o(&cfg)
+	}
 	srv := New(Deps{
 		Cfg: cfg, Auth: ta, Sandbox: sb, Repos: repos, Settings: settings, Git: gitx.NewRunner(),
 		Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
@@ -281,21 +285,51 @@ func TestRepoFlow(t *testing.T) {
 	}
 	var file struct {
 		Content string `json:"content"`
-		MTime   int64  `json:"mtime"`
+		Version string `json:"version"`
 	}
-	if err := json.Unmarshal(data, &file); err != nil || file.Content != "hello\n" {
+	if err := json.Unmarshal(data, &file); err != nil || file.Content != "hello\n" || file.Version == "" {
 		t.Fatalf("file: %s", data)
 	}
-	put := map[string]any{"content": "changed\n", "mtime": file.MTime}
-	if code, data := e.do(t, "PUT", "/api/file?repo="+repo.ID+"&path=README", put, true); code != http.StatusOK {
+	put := map[string]any{"content": "changed\n", "version": file.Version}
+	code, data = e.do(t, "PUT", "/api/file?repo="+repo.ID+"&path=README", put, true)
+	if code != http.StatusOK {
 		t.Fatalf("save: %d %s", code, data)
 	}
 	if got, _ := os.ReadFile(filepath.Join(dir, "README")); string(got) != "changed\n" {
 		t.Errorf("file on disk: %q", got)
 	}
-	stale := map[string]any{"content": "again\n", "mtime": file.MTime - 100}
+	var saved struct {
+		Version string `json:"version"`
+	}
+	if err := json.Unmarshal(data, &saved); err != nil || saved.Version == "" || saved.Version == file.Version {
+		t.Errorf("version after save: %s", data)
+	}
+	// старая версия: файл уже изменён
+	stale := map[string]any{"content": "again\n", "version": file.Version}
 	if code, _ := e.do(t, "PUT", "/api/file?repo="+repo.ID+"&path=README", stale, true); code != http.StatusConflict {
-		t.Errorf("stale mtime must conflict: %d", code)
+		t.Errorf("stale version must conflict: %d", code)
+	}
+	// изменение на диске в пределах той же секунды тоже замечается
+	full := filepath.Join(dir, "README")
+	info, err := os.Stat(full)
+	if err != nil {
+		t.Fatal(err)
+	}
+	same := info.ModTime().Truncate(time.Second).Add(time.Millisecond)
+	if err := os.Chtimes(full, same, same); err != nil {
+		t.Fatal(err)
+	}
+	_, data = e.do(t, "GET", "/api/file?repo="+repo.ID+"&path=README", nil, false)
+	if err := json.Unmarshal(data, &file); err != nil {
+		t.Fatal(err)
+	}
+	later := same.Add(500 * time.Millisecond)
+	if err := os.Chtimes(full, later, later); err != nil {
+		t.Fatal(err)
+	}
+	sub := map[string]any{"content": "x\n", "version": file.Version}
+	if code, _ := e.do(t, "PUT", "/api/file?repo="+repo.ID+"&path=README", sub, true); code != http.StatusConflict {
+		t.Errorf("sub-second change must conflict: %d", code)
 	}
 
 	// выход за пределы репозитория

@@ -6,5 +6,6 @@
   "auth_mode": "token",
   "pam_service": "gitaway",
   "session_ttl": "12h",
-  "trust_proxy": false
+  "trust_proxy": false,
+  "allow_cidrs": []
 }

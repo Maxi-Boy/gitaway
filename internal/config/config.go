@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -46,6 +47,7 @@ type Config struct {
 	PAMService    string   `json:"pam_service"`    // имя файла в /etc/pam.d
 	SessionTTL    Duration `json:"session_ttl"`
 	TrustProxy    bool     `json:"trust_proxy"` // доверять X-Forwarded-Proto и X-Real-IP от nginx
+	AllowCIDRs    []string `json:"allow_cidrs"` // откуда можно подключаться; пусто: отовсюду
 }
 
 // Default возвращает настройки по умолчанию.
@@ -120,7 +122,43 @@ func (c *Config) Normalize() error {
 	if c.SessionTTL.Duration <= 0 {
 		return errors.New("session_ttl must be positive")
 	}
+	nets, err := ParseCIDRs(c.AllowCIDRs)
+	if err != nil {
+		return err
+	}
+	c.AllowCIDRs = c.AllowCIDRs[:0]
+	for _, n := range nets {
+		c.AllowCIDRs = append(c.AllowCIDRs, n.String())
+	}
 	return nil
+}
+
+// ParseCIDRs разбирает allow_cidrs: сети вида "10.0.0.0/8" и отдельные адреса
+// ("192.168.1.5" это одна машина). Адрес вида "10.1.2.3/8" приводится к сети.
+func ParseCIDRs(list []string) ([]netip.Prefix, error) {
+	out := make([]netip.Prefix, 0, len(list))
+	for _, s := range list {
+		s = strings.TrimSpace(s)
+		var p netip.Prefix
+		if strings.Contains(s, "/") {
+			v, err := netip.ParsePrefix(s)
+			if err != nil {
+				return nil, fmt.Errorf("allow_cidrs: %q: %w", s, err)
+			}
+			p = v.Masked()
+		} else {
+			a, err := netip.ParseAddr(s)
+			if err != nil {
+				return nil, fmt.Errorf("allow_cidrs: %q: %w", s, err)
+			}
+			p = netip.PrefixFrom(a, a.BitLen())
+		}
+		if p.Addr().Zone() != "" {
+			return nil, fmt.Errorf("allow_cidrs: %q: zones are not supported", s)
+		}
+		out = append(out, p)
+	}
+	return out, nil
 }
 
 // IsLoopback сообщает, что сервер слушает только локальный интерфейс.

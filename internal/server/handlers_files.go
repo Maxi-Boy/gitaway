@@ -2,9 +2,11 @@ package server
 
 import (
 	"bytes"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"unicode/utf8"
 
 	"github.com/Maxi-Boy/gitaway/internal/auth"
@@ -12,9 +14,17 @@ import (
 
 const maxFileSize = 5 << 20 // 5 МБ: больше файлы редактор не открывает
 
+// fileVersion это метка состояния файла: время изменения в наносекундах и размер.
+// Строка, а не число: в JavaScript целые больше 2^53 теряют точность.
+// Размер помогает на файловых системах с грубым временем (секунды и хуже).
+func fileVersion(info fs.FileInfo) string {
+	return strconv.FormatInt(info.ModTime().UnixNano(), 10) + "-" + strconv.FormatInt(info.Size(), 10)
+}
+
 // handleFile: GET читает текстовый файл, PUT сохраняет его атомарно.
-// В PUT поле mtime это время изменения, которое клиент видел при открытии:
-// если файл на диске успел измениться (правка в терминале, git pull), вернётся 409.
+// В PUT поле version это метка, которую клиент получил при открытии: если файл
+// на диске успел измениться (правка в терминале, git pull), вернётся 409.
+// Пустая version означает запись без проверки (новый файл или «сохранить всё равно»).
 func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, _ auth.Session) error {
 	_, dir, err := s.workdir(r)
 	if err != nil {
@@ -53,14 +63,15 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, _ auth.Sessi
 			return &apiError{http.StatusUnsupportedMediaType, "unsupported_encoding", "only UTF-8 files can be edited"}
 		}
 		writeJSON(w, http.StatusOK, map[string]any{
-			"path": rel, "content": string(data), "size": info.Size(), "mtime": info.ModTime().Unix(),
+			"path": rel, "content": string(data), "size": info.Size(),
+			"mtime": info.ModTime().Unix(), "version": fileVersion(info),
 		})
 		return nil
 
 	case http.MethodPut:
 		var req struct {
 			Content string `json:"content"`
-			MTime   int64  `json:"mtime"`
+			Version string `json:"version"`
 		}
 		if err := decodeJSON(w, r, &req); err != nil {
 			return err
@@ -78,7 +89,7 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, _ auth.Sessi
 				return errBad("path is a directory")
 			}
 			mode = info.Mode().Perm()
-			if req.MTime != 0 && info.ModTime().Unix() != req.MTime {
+			if req.Version != "" && fileVersion(info) != req.Version {
 				return &apiError{http.StatusConflict, "changed_on_disk", "file changed on disk since it was opened"}
 			}
 		}
@@ -89,7 +100,9 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, _ auth.Sessi
 		if err != nil {
 			return err
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"size": info.Size(), "mtime": info.ModTime().Unix()})
+		writeJSON(w, http.StatusOK, map[string]any{
+			"size": info.Size(), "mtime": info.ModTime().Unix(), "version": fileVersion(info),
+		})
 		return nil
 	}
 	return errMethod

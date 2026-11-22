@@ -58,6 +58,8 @@ func TestLoadRejectsBadValues(t *testing.T) {
 		"empty root": `{"roots":[]}`,
 		"duration":   `{"session_ttl":"soon"}`,
 		"negative":   `{"session_ttl":"-1h"}`,
+		"bad cidr":   `{"allow_cidrs":["10.0.0.0/33"]}`,
+		"bad addr":   `{"allow_cidrs":["example.com"]}`,
 	}
 	for name, data := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -80,6 +82,22 @@ func TestIsLoopback(t *testing.T) {
 		c := Config{Listen: addr}
 		if got := c.IsLoopback(); got != want {
 			t.Errorf("%s: got %v, want %v", addr, got, want)
+		}
+	}
+}
+
+func TestAllowCIDRs(t *testing.T) {
+	c, err := Load(writeConfig(t, `{"allow_cidrs":["10.1.2.3/8"," 192.168.1.5 ","fd00::/64"]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"10.0.0.0/8", "192.168.1.5/32", "fd00::/64"}
+	if len(c.AllowCIDRs) != len(want) {
+		t.Fatalf("got %v, want %v", c.AllowCIDRs, want)
+	}
+	for i := range want {
+		if c.AllowCIDRs[i] != want[i] {
+			t.Errorf("got %v, want %v", c.AllowCIDRs, want)
 		}
 	}
 }
