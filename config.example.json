@@ -1,0 +1,10 @@
+{
+  "listen": "127.0.0.1:8450",
+  "roots": ["~/projects"],
+  "default_folder": "~/projects/export",
+  "data_dir": "~/.config/gitaway",
+  "auth_mode": "token",
+  "pam_service": "gitaway",
+  "session_ttl": "12h",
+  "trust_proxy": false
+}

@@ -1,0 +1,6 @@
+bin/
+*.tar.gz
+*.test
+.idea/
+.vscode/
+config.json

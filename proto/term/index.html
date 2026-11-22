@@ -1,0 +1,28 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>term poc</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css">
+<style>html,body{margin:0;height:100%;background:#000}#t{height:100%}</style>
+<div id="t"></div>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js"></script>
+<script>
+const term = new Terminal({ cursorBlink: true });
+const fit = new FitAddon.FitAddon();
+term.loadAddon(fit);
+term.open(document.getElementById('t'));
+fit.fit();
+const token = new URLSearchParams(location.search).get('token') || '';
+const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+const ws = new WebSocket(proto + '://' + location.host + '/ws?token=' + encodeURIComponent(token));
+ws.binaryType = 'arraybuffer';
+const enc = new TextEncoder();
+function sendSize() {
+  if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+}
+ws.onopen = sendSize;
+ws.onmessage = (e) => term.write(new Uint8Array(e.data));
+ws.onclose = () => term.write('\r\n[соединение закрыто]\r\n');
+term.onData((d) => { if (ws.readyState === 1) ws.send(enc.encode(d)); });
+window.addEventListener('resize', () => { fit.fit(); sendSize(); });
+</script>
