@@ -39,9 +39,11 @@ CI (`.github/workflows/ci.yml`) на каждый push: build, vet, test -race, 
     internal/jobs/     KeyedLock: одна операция на репозиторий или каталог
     internal/copyop/   копирование между панелями: план -> решения -> атомарная запись
     internal/server/   HTTP API, middleware, обработчики
-    web/               статический интерфейс через go:embed (сейчас временная страница)
+    web/               интерфейс через go:embed: index.html и ES-модули в web/app/
+                       (main, actions, store, router, commands, ui, i18n/ru.js, views/)
     proto/             прототипы PAM, терминала, замера (отдельный модуль, CI не собирает)
     packaging/         systemd-юнит gitaway@.service, пример nginx
+    tools/uicheck/     заглушка API и сценарий Playwright: проверка интерфейса без Go
 
 ## Правила (не нарушать без явного решения пользователя)
 
@@ -75,6 +77,9 @@ CI (`.github/workflows/ci.yml`) на каждый push: build, vet, test -race, 
   тест в `internal/server` через `httptest`.
 - После правок запускать `gofmt`. Если Go в окружении нет, выравнивать вручную
   и проверять результат по CI.
+- Интерфейс: тексты только через `t('ключ')` из `web/app/i18n/ru.js`; действия регистрируются
+  командами (`commands.register`), кнопки и меню вызывают команды или `actions.js`.
+  После правок интерфейса прогонять `tools/uicheck` (при изменении API обновить заглушку).
 
 ## Окружение и процесс
 

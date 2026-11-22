@@ -3,8 +3,7 @@ package web
 
 import "embed"
 
-// FS это файлы интерфейса. Сейчас это временная страница для проверки API;
-// настоящий интерфейс будет построен по макету.
+// FS это файлы интерфейса: index.html и ES-модули в app/ (без шага сборки).
 //
-//go:embed index.html app.js
+//go:embed index.html app
 var FS embed.FS

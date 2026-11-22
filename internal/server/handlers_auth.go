@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"os"
 
 	"github.com/Maxi-Boy/gitaway/internal/auth"
 )
@@ -83,7 +84,9 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request, sess auth.Sess
 	if r.Method != http.MethodGet {
 		return errMethod
 	}
+	host, _ := os.Hostname()
 	writeJSON(w, http.StatusOK, map[string]any{
+		"host":           host,
 		"user":           sess.User,
 		"csrf":           sess.CSRF,
 		"roots":          s.sandbox.Roots(),

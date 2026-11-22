@@ -246,8 +246,9 @@ func TestSettings(t *testing.T) {
 	code, data = e.do(t, "GET", "/api/me", nil, false)
 	var me struct {
 		DefaultFolder string `json:"default_folder"`
+		Host          string `json:"host"`
 	}
-	if code != http.StatusOK || json.Unmarshal(data, &me) != nil || me.DefaultFolder != out {
+	if code != http.StatusOK || json.Unmarshal(data, &me) != nil || me.DefaultFolder != out || me.Host == "" {
 		t.Errorf("me: %d %s", code, data)
 	}
 

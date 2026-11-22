@@ -4,3 +4,4 @@ bin/
 .idea/
 .vscode/
 config.json
+tools/uicheck/shots/

@@ -1,0 +1,185 @@
+// Заглушка API gitaway для проверки интерфейса в браузере без Go (только для разработки).
+import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+
+const WEB = process.argv[2];
+const PORT = Number(process.argv[3] || 8451);
+const now = Math.floor(Date.now() / 1000);
+const H = 3600;
+let logged = false;
+const ROOT = '/home/sysadmin/projects';
+const repos = [
+  { id: 'r1', path: ROOT + '/myrepo', remote: 'git@github.com:Maxi-Boy/myrepo.git' },
+  { id: 'r2', path: ROOT + '/docs-site', remote: '' },
+];
+let settings = { default_folder: ROOT + '/export', open_on_start: true, ask_on_overwrite: true, move_by_default: false };
+const wts = [
+  { path: ROOT + '/myrepo', branch: 'main', main: true },
+  { path: ROOT + '/myrepo.worktrees/feature-login', branch: 'feature/login', main: false },
+];
+const branches = [
+  { name: 'main', remote: false, upstream: 'origin/main', ahead: 0, behind: 0, current: true },
+  { name: 'feature/login', remote: false, upstream: 'origin/feature/login', ahead: 1, behind: 2, current: false },
+  { name: 'fix/api-timeout', remote: false, upstream: '', ahead: 0, behind: 0, current: false },
+  { name: 'origin/main', remote: true, ahead: 0, behind: 0 },
+  { name: 'origin/release-2.1', remote: true, ahead: 0, behind: 0 },
+];
+let changes = {
+  [ROOT + '/myrepo']: [],
+  [ROOT + '/myrepo.worktrees/feature-login']: [
+    { path: 'git/status.go', x: ' ', y: 'M' },
+    { path: 'server.go', x: 'M', y: ' ' },
+    { path: 'worktree.go', x: '?', y: '?' },
+  ],
+};
+const tree = {
+  '': [
+    { name: 'api', is_dir: true, size: 4096, mtime: now - 2 * H },
+    { name: 'auth', is_dir: true, size: 4096, mtime: now - 30 * H },
+    { name: 'git', is_dir: true, size: 4096, mtime: now - 20 * H },
+    { name: 'server.go', is_dir: false, size: 3990, mtime: now - 25 * H },
+    { name: 'worktree.go', is_dir: false, size: 1200, mtime: now - 600 },
+    { name: 'README.md', is_dir: false, size: 820, mtime: now - 90 * H },
+  ],
+  git: [
+    { name: 'branches.go', is_dir: false, size: 2100, mtime: now - 120 * H },
+    { name: 'status.go', is_dir: false, size: 1150, mtime: now - 300 },
+  ],
+};
+const commits = {
+  '': {
+    api: { hash: 'a1', author: 'i.petrov', subject: 'Add pull endpoint, ff-only', time: now - 2 * H },
+    auth: { hash: 'a2', author: 'sysadmin', subject: 'PAM login and session cookies', time: now - 26 * H },
+    git: { hash: 'a3', author: 'sysadmin', subject: 'Parse ahead/behind counters', time: now - 22 * H },
+    'server.go': { hash: 'a4', author: 'sysadmin', subject: 'Wire auth middleware', time: now - 25 * H },
+    'README.md': { hash: 'a5', author: 'i.petrov', subject: 'Describe worktree tabs', time: now - 5 * 24 * H },
+  },
+  git: {
+    'branches.go': { hash: 'b1', author: 'sysadmin', subject: 'List local and remote branches', time: now - 5 * 24 * H },
+    'status.go': { hash: 'a3', author: 'sysadmin', subject: 'Parse ahead/behind counters', time: now - 22 * H },
+  },
+};
+const files = { 'README.md': '# myrepo\n\nПример файла.\n', 'server.go': 'package main\n\nfunc main() {\n\tprintln("hi")\n}\n' };
+let fileVer = 1;
+const fsDirs = {
+  [ROOT]: [{ name: 'export', is_dir: true, size: 0, mtime: now - 50 * H }, { name: 'myrepo', is_dir: true, size: 0, mtime: now - H }],
+  [ROOT + '/export']: [
+    { name: 'docs', is_dir: true, size: 0, mtime: now - 200 * H },
+    { name: 'server.go', is_dir: false, size: 3900, mtime: now - 240 * H },
+    { name: 'README.md', is_dir: false, size: 800, mtime: now - 100 * H },
+  ],
+  [ROOT + '/export/docs']: [],
+};
+
+function json(res, code, v) {
+  res.writeHead(code, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(v));
+}
+const err = (res, code, c, m) => json(res, code, { error: { code: c, message: m } });
+
+function body(req) {
+  return new Promise((r) => {
+    let s = '';
+    req.on('data', (d) => (s += d));
+    req.on('end', () => r(s ? JSON.parse(s) : {}));
+  });
+}
+
+function status(wt) {
+  const p = wt || ROOT + '/myrepo';
+  const b = wts.find((w) => w.path === p);
+  const br = branches.find((x) => x.name === b?.branch);
+  return { branch: b?.branch, upstream: br?.upstream, ahead: br?.ahead || 0, behind: br?.behind || 0, changes: changes[p] || [] };
+}
+
+http.createServer(async (req, res) => {
+  const u = new URL(req.url, 'http://x');
+  const q = Object.fromEntries(u.searchParams);
+  const p = u.pathname;
+  if (!p.startsWith('/api/')) {
+    const f = path.join(WEB, p === '/' ? 'index.html' : p);
+    if (!f.startsWith(WEB) || !fs.existsSync(f)) { res.writeHead(404); return res.end(); }
+    const type = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html' }[path.extname(f)] || 'application/octet-stream';
+    res.writeHead(200, { 'Content-Type': type, 'Content-Security-Policy': "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'" });
+    return res.end(fs.readFileSync(f));
+  }
+  if (p === '/api/login') {
+    const b = await body(req);
+    if (b.password !== 'secret') return err(res, 401, 'invalid_credentials', 'invalid credentials');
+    logged = true;
+    return json(res, 200, { user: b.username, csrf: 'tok' });
+  }
+  if (!logged) return err(res, 401, 'unauthorized', 'login required');
+  if (req.method !== 'GET' && req.headers['x-csrf-token'] !== 'tok') return err(res, 403, 'bad_csrf', 'csrf');
+  const b = req.method === 'GET' ? {} : await body(req);
+  switch (p) {
+    case '/api/me': return json(res, 200, { user: 'sysadmin', host: 'nvme-lab', csrf: 'tok', roots: [ROOT], default_folder: settings.default_folder });
+    case '/api/logout': logged = false; return json(res, 200, { ok: true });
+    case '/api/repos': return json(res, 200, repos);
+    case '/api/settings': if (req.method === 'PUT') settings = { ...settings, ...b }; return json(res, 200, settings);
+    case '/api/worktrees': return json(res, 200, q.repo === 'r1' ? wts : [{ path: repos[1].path, branch: 'main', main: true }]);
+    case '/api/branches': return json(res, 200, q.repo === 'r1' ? branches : [branches[0]]);
+    case '/api/status': return json(res, 200, status(q.wt));
+    case '/api/tree': {
+      const list = tree[q.path || ''];
+      if (!list) return err(res, 404, 'not_found', 'not found');
+      const ch = changes[q.wt || ROOT + '/myrepo'] || [];
+      const marks = {};
+      for (const c of ch) {
+        const rel = q.path ? c.path.slice(q.path.length + 1) : c.path;
+        if (q.path && !c.path.startsWith(q.path + '/')) continue;
+        const [n, ...rest] = rel.split('/');
+        marks[n] = rest.length && c.x !== '?' ? '*' : (c.x + c.y).trim();
+      }
+      return json(res, 200, { path: q.path || '', entries: list.map((e) => ({ ...e, status: marks[e.name] })), truncated: false });
+    }
+    case '/api/commits': return setTimeout(() => json(res, 200, commits[q.path || ''] || {}), 300);
+    case '/api/file':
+      if (req.method === 'PUT') { files[q.path] = b.content; fileVer++; return json(res, 200, { size: b.content.length, mtime: now, version: 'v' + fileVer }); }
+      if (!(q.path in files)) return json(res, 200, { path: q.path, content: '// ' + q.path + '\npackage git\n', size: 20, mtime: now, version: 'v' + fileVer });
+      return json(res, 200, { path: q.path, content: files[q.path], size: files[q.path].length, mtime: now, version: 'v' + fileVer });
+    case '/api/diff':
+      return json(res, 200, { path: q.path, staged: q.staged === '1', untracked: q.path === 'worktree.go',
+        text: `diff --git a/${q.path} b/${q.path}\nindex 1a2b3c..4d5e6f 100644\n--- a/${q.path}\n+++ b/${q.path}\n@@ -10,6 +10,8 @@ func Status() {\n \tctx := context.Background()\n-\tout, err := run(ctx, "status")\n+\tout, err := run(ctx, "status", "--porcelain=v1")\n+\tif err != nil {\n+\t\treturn nil, err\n+\t}\n \treturn parse(out)\n` });
+    case '/api/fs': {
+      const dir = q.dir || settings.default_folder;
+      if (!fsDirs[dir]) return err(res, 403, 'outside_roots', 'outside');
+      return json(res, 200, { dir, path: '', entries: fsDirs[dir], truncated: false });
+    }
+    case '/api/fs/mkdir': fsDirs[b.dir].push({ name: b.name, is_dir: true, size: 0, mtime: now }); fsDirs[b.dir + '/' + b.name] = []; return json(res, 201, { dir: b.dir, path: b.name });
+    case '/api/copy/plan': {
+      const names = new Set((fsDirs[b.dst.dir] || []).map((e) => e.name));
+      const conflicts = b.items.filter((n) => names.has(n)).map((n) => ({
+        rel: n, src_rel: n, src: { size: 3990, mtime: now - 25 * H, birth: now - 400 * H }, dst: { size: 3900, mtime: now - 240 * H, birth: now - 240 * H },
+        newer: 'src', src_commit_time: now - 25 * H }));
+      return json(res, 200, { dirs: [], files: b.items.map((n) => ({ rel: n, src_rel: n, size: 1000 })), conflicts, skipped: [], blocked: [], total_bytes: 1000 * b.items.length });
+    }
+    case '/api/copy': {
+      const d = fsDirs[b.dst.dir];
+      const res2 = { copied: [], replaced: [], renamed: [], skipped: [], failed: [], bytes: 0 };
+      for (const n of b.items) {
+        const dec = b.decisions?.[n];
+        if (d.some((e) => e.name === n)) {
+          if (dec === 'skip') res2.skipped.push({ rel: n, reason: 'skip' });
+          else if (dec === 'keep_both') { d.push({ name: n + ' (2)', is_dir: false, size: 1000, mtime: now }); res2.renamed.push({ from: n, to: n + ' (2)' }); }
+          else res2.replaced.push(n);
+        } else { d.push({ name: n, is_dir: false, size: 1000, mtime: now }); res2.copied.push(n); }
+        res2.bytes += 1000;
+      }
+      return json(res, 200, res2);
+    }
+    case '/api/worktrees/add': return json(res, 201, {});
+  }
+  if (p.startsWith('/api/git/')) {
+    const op = p.slice(9);
+    const wt = b.wt || ROOT + '/myrepo';
+    if (op === 'stage') { changes[wt] = changes[wt].map((c) => (b.paths.includes(c.path) || b.paths.includes('.') ? { ...c, x: c.x === '?' ? 'A' : c.y !== ' ' ? c.y : c.x, y: ' ' } : c)); return json(res, 200, { status: status(b.wt) }); }
+    if (op === 'unstage') { changes[wt] = changes[wt].map((c) => (b.paths.includes(c.path) || b.paths.includes('.') ? { ...c, x: c.x === 'A' ? '?' : ' ', y: c.x === 'A' ? '?' : c.x } : c)); return json(res, 200, { status: status(b.wt) }); }
+    if (op === 'discard') { changes[wt] = changes[wt].filter((c) => !b.paths.includes(c.path)); return json(res, 200, { discarded: b.paths, status: status(b.wt) }); }
+    if (op === 'commit') { changes[wt] = changes[wt].filter((c) => c.x === ' ' || c.x === '?').map((c) => c); return json(res, 200, { commit: 'abcdef1234567890abcdef1234567890abcdef12', output: '[feature/login abcdef1] ' + b.message, status: status(b.wt) }); }
+    if (op === 'push') return err(res, 422, 'git_failed', 'git push: exit 1: ! [rejected] feature/login -> feature/login (non-fast-forward)');
+    return json(res, 200, { output: op === 'fetch' ? 'From github.com:Maxi-Boy/myrepo\n   1a2b3c..4d5e6f  main -> origin/main' : 'Already up to date.' });
+  }
+  err(res, 404, 'not_found', 'unknown API endpoint');
+}).listen(PORT, '127.0.0.1');
