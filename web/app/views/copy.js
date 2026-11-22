@@ -1,6 +1,6 @@
 // Копирование из ветки в папку сервера: план, диалог конфликтов, выполнение.
 // Сравниваются размер, дата изменения, дата создания и дата коммита источника.
-import { h, mount, dialog, toast, size, stamp, fullStamp } from '../ui.js';
+import { h, mount, dialog, toast, size, stampYY, fullStamp } from '../ui.js';
 import { t } from '../i18n.js';
 import { api } from '../api.js';
 import { state, bus, emit, wtParam, addLog } from '../store.js';
@@ -101,7 +101,7 @@ function conflictDialog(plan, req) {
       const c = list[i];
       const newer = (side) => (c.newer === side ? h('span', { class: 'newer' }, ' · ' + t('copy.newer')) : null);
       const row = (label, a, b) => [h('span', { class: 'muted' }, label), h('span', {}, a), h('span', {}, b)];
-      const when = (unix) => h('span', { title: fullStamp(unix) }, stamp(unix));
+      const when = (unix) => h('span', { title: fullStamp(unix) }, stampYY(unix));
       const noBirth = !c.src.birth || !c.dst.birth;
       const left = list.length - i;
       mount(box,

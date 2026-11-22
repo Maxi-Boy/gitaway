@@ -224,6 +224,14 @@ export function stamp(unix) {
   return d.getFullYear() === new Date().getFullYear() ? dtf.format(d) : dtfYear.format(d);
 }
 
+// stampYY: "22/11/26 11:00", с коротким годом; для сравнения дат в диалоге конфликта.
+export function stampYY(unix) {
+  if (!unix) return '—';
+  const d = new Date(unix * 1000);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${p(d.getFullYear() % 100)} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
 export function fullStamp(unix) {
   return unix ? new Date(unix * 1000).toLocaleString('ru') : '—';
 }
