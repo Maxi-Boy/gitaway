@@ -88,7 +88,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/fs", s.api(s.handleFS))
 	mux.HandleFunc("/api/fs/mkdir", s.api(s.handleMkdir))
 	mux.HandleFunc("/api/settings", s.api(s.handleSettings))
+	mux.HandleFunc("/api/diff", s.api(s.handleDiff))
 	s.registerGit(mux)
+	s.registerChanges(mux)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "unknown API endpoint")
 	})
