@@ -38,7 +38,7 @@
     internal/server/   HTTP API
     web/               статический интерфейс (go:embed)
     proto/             прототипы PAM, терминала и замера last-commit (отдельный модуль)
-    docs/              решения и статус
+    docs/              решения (DECISIONS.md) и план (ROADMAP.md)
     packaging/         systemd-юнит и пример nginx
 
 ## Проверки качества
