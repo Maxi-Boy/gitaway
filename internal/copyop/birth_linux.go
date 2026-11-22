@@ -33,7 +33,7 @@ func birthTime(path string) (time.Time, bool) {
 	if binary.NativeEndian.Uint32(buf[0:4])&statxBtime == 0 { // stx_mask
 		return time.Time{}, false
 	}
-	sec := int64(binary.NativeEndian.Uint64(buf[0x50:0x58])) // stx_btime.tv_sec
+	sec := int64(binary.NativeEndian.Uint64(buf[0x50:0x58]))  // stx_btime.tv_sec
 	nsec := int64(binary.NativeEndian.Uint32(buf[0x58:0x5c])) // stx_btime.tv_nsec
 	if sec <= 0 {
 		return time.Time{}, false
