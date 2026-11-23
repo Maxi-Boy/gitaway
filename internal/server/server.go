@@ -16,6 +16,7 @@ import (
 	"github.com/Maxi-Boy/gitaway/internal/auth"
 	"github.com/Maxi-Boy/gitaway/internal/config"
 	"github.com/Maxi-Boy/gitaway/internal/fsx"
+	"github.com/Maxi-Boy/gitaway/internal/github"
 	"github.com/Maxi-Boy/gitaway/internal/gitx"
 	"github.com/Maxi-Boy/gitaway/internal/jobs"
 	"github.com/Maxi-Boy/gitaway/internal/session"
@@ -36,6 +37,7 @@ type Deps struct {
 	Terms    *session.Manager // терминалы и другие процессы в pty (nil: новый менеджер)
 	Tasks    *TasksDoc        // мои скрипты (nil: только в памяти)
 	Trust    *TrustDoc        // доверие к .gitaway.json (nil: только в памяти)
+	Keys     *KeysDoc         // deploy-ключи GitHub (nil: только в памяти)
 }
 
 // Server обслуживает API и статические файлы.
@@ -57,6 +59,8 @@ type Server struct {
 	terms    *session.Manager
 	tasks    *TasksDoc
 	trust    *TrustDoc
+	keys     *KeysDoc
+	ghURL    func(ref github.Ref, transport string) string // для тестов: адрес вместо GitHub
 }
 
 func New(d Deps) *Server {
@@ -81,6 +85,10 @@ func New(d Deps) *Server {
 	if trustDoc == nil {
 		trustDoc, _ = store.OpenDoc("", map[string][]string{})
 	}
+	keysDoc := d.Keys
+	if keysDoc == nil {
+		keysDoc, _ = store.OpenDoc("", []github.Key{})
+	}
 	return &Server{
 		cfg:      d.Cfg,
 		auth:     d.Auth,
@@ -99,6 +107,7 @@ func New(d Deps) *Server {
 		terms:    terms,
 		tasks:    tasksDoc,
 		trust:    trustDoc,
+		keys:     keysDoc,
 	}
 }
 
@@ -128,6 +137,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/tasks/mine", s.api(s.handleMyTasks))
 	mux.HandleFunc("/api/tasks/trust", s.api(s.handleTrust))
 	mux.HandleFunc("/api/tasks/run", s.api(s.handleRunTask))
+	mux.HandleFunc("/api/github/key", s.api(s.handleGitHubKey))
+	mux.HandleFunc("/api/github/check", s.api(s.handleGitHubCheck))
+	mux.HandleFunc("/api/github/clone", s.api(s.handleGitHubClone))
 	s.registerGit(mux)
 	s.registerChanges(mux)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {

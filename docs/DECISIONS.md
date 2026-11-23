@@ -61,6 +61,9 @@
 | GET/PUT /api/tasks/mine | мои скрипты: список целиком (PUT заменяет, проверяет cwd и scope) |
 | POST /api/tasks/trust | {repo, wt, hash}: доверять текущей версии .gitaway.json (хеш должен совпасть) |
 | POST /api/tasks/run | {repo, wt, id}: запустить задачу как сеанс (kind task), ответ: сеанс |
+| POST /api/github/key | {url}: deploy-ключ для owner/repo (новый или уже созданный), публичная часть и ссылка на настройки |
+| POST /api/github/check | {key_id}: git ls-remote ключом (порт 22, при сетевой ошибке 443), {ok, code, output} |
+| POST /api/github/clone | {key_id, dest} или {url, public, dest}: клонирование сеансом, затем регистрация |
 | GET/POST/DELETE /api/sessions | терминалы: список, новый {repo, wt} или {dir}, остановить ?id= |
 | GET /api/sessions/ws?id= | WebSocket сеанса: буфер вывода, затем живой поток |
 | GET /api/jobs/{id} | состояние и вывод задачи |
@@ -245,3 +248,18 @@ API: `GET/POST/DELETE /api/sessions`, `GET /api/sessions/ws?id=` (двоичны
   скриптов. Вкладка «Задачи» нижней панели: запуски и все задачи (на телефоне задачи там). Запуск открывает сеанс
   в терминале; значок последней задачи на вкладке ветки (▶ идёт, ✓, ✗). Повтор последней:
   Ctrl+Shift+B (F5 оставлен браузеру). Уведомление браузера только если вкладка не на экране.
+
+## GitHub: deploy-ключи (0.2)
+
+- Ключ ed25519 на каждый репозиторий создаётся в Go (формат OpenSSH, без ssh-keygen),
+  закрытая часть `data_dir/keys/<id>` (0600, каталог 0700), описание в `data_dir/keys.json`.
+  Повторный запрос для того же owner/repo отдаёт тот же ключ: его уже могли добавить на GitHub.
+- Ключ хоста GitHub закреплён (ed25519, SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU)
+  в своём `data_dir/known_hosts`, `StrictHostKeyChecking=yes`; `~/.ssh` пользователя не трогается.
+- Проверка: `git ls-remote` по SSH на 22, при сетевой ошибке SSH через 443 (`ssh.github.com`);
+  рабочий способ запоминается у ключа. Причины отказа: denied (ключ не добавлен), not_found,
+  network, host_key.
+- Клонирование идёт сеансом (вывод в терминале). После успеха в `.git/config` репозитория
+  пишется `core.sshCommand` с ключом: fetch, pull, push работают из интерфейса и из терминала.
+- Публичный репозиторий можно клонировать по HTTPS без ключа (только чтение).
+- Токены GitHub не используются и не хранятся. Device Flow с автодобавлением ключа: позже.

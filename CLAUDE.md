@@ -38,7 +38,9 @@ CI (`.github/workflows/ci.yml`) на каждый push: build, vet, test -race, 
     internal/store/    repos.json и settings.json (0600, атомарная запись)
     internal/jobs/     KeyedLock: одна операция на репозиторий или каталог
     internal/copyop/   копирование между панелями: план -> решения -> атомарная запись
-    internal/session/  процессы в pty (терминал, позже задачи): буфер вывода, переподключение
+    internal/session/  процессы в pty (терминал, задачи, clone): буфер вывода, переподключение
+    internal/tasks/    задачи: мои скрипты, .gitaway.json с доверием, автоопределение, сценарий sh
+    internal/github/   deploy-ключи GitHub: разбор адреса, ключ ed25519, закреплённый ключ хоста
     internal/server/   HTTP API, middleware, обработчики
     web/               интерфейс через go:embed: index.html и ES-модули в web/app/
                        (main, actions, store, router, commands, ui, i18n/ru.js, views/)

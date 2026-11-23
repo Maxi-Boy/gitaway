@@ -28,6 +28,7 @@ type testEnv struct {
 	root  string
 	c     *http.Client
 	csrf  string
+	srv   *Server
 }
 
 // newEnv поднимает сервер с тестовым окружением git; opts меняют конфигурацию.
@@ -80,7 +81,7 @@ func newEnv(t *testing.T, opts ...func(*config.Config)) *testEnv {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &testEnv{ts: ts, token: ta.Token(), root: root, c: &http.Client{Jar: jar}}
+	return &testEnv{ts: ts, token: ta.Token(), root: root, c: &http.Client{Jar: jar}, srv: srv}
 }
 
 func (e *testEnv) do(t *testing.T, method, path string, body any, withCSRF bool) (int, []byte) {

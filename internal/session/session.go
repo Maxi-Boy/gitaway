@@ -56,8 +56,9 @@ type Options struct {
 	Cols  uint16
 	Rows  uint16
 
-	Kind    string        // shell (по умолчанию) или task
+	Kind    string        // shell (по умолчанию), task или clone
 	Timeout time.Duration // 0: без ограничения; по истечении процесс останавливается
+	Env     []string      // дополнительные переменные окружения процесса
 }
 
 // Manager хранит сеансы этого процесса gitaway.
@@ -128,6 +129,7 @@ func (m *Manager) Start(o Options) (*Session, error) {
 		env = os.Environ()
 	}
 	cmd.Env = append(append([]string{}, env...), "TERM=xterm-256color", "COLORTERM=truecolor")
+	cmd.Env = append(cmd.Env, o.Env...)
 	size := &pty.Winsize{Cols: o.Cols, Rows: o.Rows}
 	if size.Cols == 0 || size.Rows == 0 {
 		size = &pty.Winsize{Cols: 120, Rows: 32}

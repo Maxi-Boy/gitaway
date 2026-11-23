@@ -17,6 +17,7 @@ import (
 	"github.com/Maxi-Boy/gitaway/internal/auth"
 	"github.com/Maxi-Boy/gitaway/internal/config"
 	"github.com/Maxi-Boy/gitaway/internal/fsx"
+	"github.com/Maxi-Boy/gitaway/internal/github"
 	"github.com/Maxi-Boy/gitaway/internal/gitx"
 	"github.com/Maxi-Boy/gitaway/internal/server"
 	"github.com/Maxi-Boy/gitaway/internal/store"
@@ -73,6 +74,10 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	keys, err := store.OpenDoc(filepath.Join(cfg.DataDir, "keys.json"), []github.Key{})
+	if err != nil {
+		return err
+	}
 
 	var authn auth.Authenticator
 	switch cfg.AuthMode {
@@ -114,6 +119,7 @@ func run() error {
 		Web:      web.FS,
 		Tasks:    myTasks,
 		Trust:    trust,
+		Keys:     keys,
 	})
 	httpSrv := &http.Server{
 		Addr:              cfg.Listen,

@@ -94,6 +94,24 @@ func (s *Repos) Add(path, remote string) (Repo, error) {
 	return repo, nil
 }
 
+// SetKeyID привязывает к репозиторию deploy-ключ (для показа и удаления ключа вместе с репозиторием).
+func (s *Repos) SetKeyID(id, keyID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.list {
+		if s.list[i].ID == id {
+			prev := s.list[i].KeyID
+			s.list[i].KeyID = keyID
+			if err := s.save(); err != nil {
+				s.list[i].KeyID = prev
+				return err
+			}
+			return nil
+		}
+	}
+	return ErrNotFound
+}
+
 // Remove убирает репозиторий из реестра (файлы на диске не трогаются).
 func (s *Repos) Remove(id string) error {
 	s.mu.Lock()
