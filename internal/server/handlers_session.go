@@ -134,15 +134,18 @@ func (s *Server) handleSessionWS(w http.ResponseWriter, r *http.Request, _ auth.
 			return nil
 		case p, ok := <-out:
 			if !ok {
-				select {
-				case <-sess.Done():
+				// Running сбрасывается до закрытия каналов (под тем же замком), а Done
+				// закрывается чуть позже: смотрим на Running, иначе при выходе процесса
+				// клиент изредка получал бы «slow client» вместо кода выхода.
+				if !sess.Info().Running {
+					<-sess.Done()
 					msg, _ := json.Marshal(control{Type: "exit", Code: sess.Info().ExitCode})
 					_ = c.Write(ctx, websocket.MessageText, msg)
 					c.Close(websocket.StatusNormalClosure, "exited")
-				default:
-					// клиент не успевал читать: пусть переподключится и получит буфер заново
-					c.Close(websocket.StatusTryAgainLater, "slow client")
+					return nil
 				}
+				// клиент не успевал читать: пусть переподключится и получит буфер заново
+				c.Close(websocket.StatusTryAgainLater, "slow client")
 				return nil
 			}
 			if err := c.Write(ctx, websocket.MessageBinary, p); err != nil {
