@@ -2,7 +2,7 @@
 import { api } from './api.js';
 import { state, emit, wtParam, tabName, addLog } from './store.js';
 import { parse, go } from './router.js';
-import { h, toast, confirm } from './ui.js';
+import { h, toast, confirm, dialog } from './ui.js';
 import { t } from './i18n.js';
 
 export async function loadRepos() {
@@ -260,4 +260,75 @@ export async function commit(message) {
   toast(t('changes.committed', { hash: res.commit.slice(0, 7) }));
   refreshAll();
   return res;
+}
+
+// --- слияние и удаление веток ---
+
+// merge сливает ветку в текущую ветку активной вкладки. При конфликтах объясняет,
+// что делать дальше: исправить файлы и закоммитить или отменить слияние.
+export async function merge(branch) {
+  const into = state.wt?.branch || '';
+  const cmd = 'git merge ' + branch;
+  try {
+    const res = await api.post('/api/git/merge', { repo: state.repo.id, wt: wtParam(), branch });
+    logResult(cmd, true, res.output || t('log.done'));
+    toast(t('merge.done', { branch, into }));
+  } catch (err) {
+    logResult(cmd, false, err.message);
+    await refreshStatus();
+    if (state.status?.merging) mergeConflictDialog(branch);
+    else toast(t('git.failed', { op: 'merge' }) + ': ' + err.message, { bad: true });
+  }
+  refreshAll();
+}
+
+function mergeConflictDialog(branch) {
+  const n = (state.status?.changes || []).filter((c) => c.x === 'U' || c.y === 'U' || (c.x === 'A' && c.y === 'A') || (c.x === 'D' && c.y === 'D')).length;
+  dialog({
+    title: t('merge.conflictTitle'),
+    body: [h('p', {}, t('merge.conflictBody', { branch, n })), h('p', { class: 'muted' }, t('merge.conflictHow'))],
+    buttons: [
+      { label: t('merge.abort'), danger: true, run: (close) => { close(); abortMerge(); } },
+      'grow',
+      { label: t('merge.showChanges'), primary: true, run: (close) => { close(); nav({ view: 'changes', path: '' }); } },
+    ],
+  });
+}
+
+export async function abortMerge() {
+  await gitOp('merge-abort').catch(() => {});
+}
+
+// deleteBranch удаляет локальную ветку; если в ней есть неслитые коммиты, спрашивает ещё раз.
+export async function deleteBranch(name) {
+  if (!await confirm(t('branchDel.title', { name }), t('branchDel.body'), t('branchDel.ok'), true)) return;
+  const cmd = 'git branch -d ' + name;
+  try {
+    const res = await api.post('/api/git/delete-branch', { repo: state.repo.id, wt: wtParam(), branch: name });
+    logResult(cmd, true, res.output || t('log.done'));
+  } catch (err) {
+    if (err.code !== 'not_merged') {
+      logResult(cmd, false, err.message);
+      toast(err.message, { bad: true });
+      return;
+    }
+    if (!await confirm(t('branchDel.unmergedTitle'), t('branchDel.unmergedBody', { name }), t('branchDel.force'), true)) return;
+    try {
+      const res = await api.post('/api/git/delete-branch', { repo: state.repo.id, wt: wtParam(), branch: name, force: true });
+      logResult('git branch -D ' + name, true, res.output || t('log.done'));
+    } catch (err2) {
+      logResult('git branch -D ' + name, false, err2.message);
+      toast(err2.message, { bad: true });
+    }
+  }
+  loadBranches();
+}
+
+// deleteRemoteBranch удаляет ветку на сервере (origin/x): для всех, кто работает с репозиторием.
+export async function deleteRemoteBranch(fullName) {
+  const i = fullName.indexOf('/');
+  const remote = fullName.slice(0, i);
+  const branch = fullName.slice(i + 1);
+  if (!await confirm(t('branchDel.remoteTitle', { name: fullName }), t('branchDel.remoteBody', { remote, branch }), t('branchDel.remoteOk'), true)) return;
+  await gitOp('delete-branch', { remote, branch }).catch(() => {});
 }

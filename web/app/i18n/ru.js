@@ -83,6 +83,28 @@ export default {
 
   'log.done': 'готово',
 
+  'merge.into': 'Слить в {into}',
+  'merge.done': 'Ветка {branch} слита в {into}',
+  'merge.conflictTitle': 'Слияние остановилось на конфликтах',
+  'merge.conflictBody': 'При слиянии {branch} конфликтуют файлы: {n}. Они отмечены как «конфликт» в «Изменениях».',
+  'merge.conflictHow': 'Исправьте их в редакторе или терминале, подготовьте (stage) и закоммитьте. Или отмените слияние: всё вернётся как было до него.',
+  'merge.abort': 'Отменить слияние',
+  'merge.showChanges': 'Открыть изменения',
+  'merge.inProgress': 'Идёт слияние: исправьте конфликты и закоммитьте или отмените его.',
+
+  'branchDel.menu': 'Удалить ветку…',
+  'branchDel.hasTab': 'Удалить ветку (сначала закройте её вкладку)',
+  'branchDel.title': 'Удалить ветку {name}?',
+  'branchDel.body': 'Удаляется только локальная ветка. Ветка на сервере (origin) останется.',
+  'branchDel.ok': 'Удалить',
+  'branchDel.unmergedTitle': 'В ветке есть неслитые коммиты',
+  'branchDel.unmergedBody': 'Коммиты ветки {name} не попали ни в текущую ветку, ни на сервер. После удаления их можно найти только через git reflog.',
+  'branchDel.force': 'Удалить всё равно',
+  'branchDel.remoteMenu': 'Удалить на сервере…',
+  'branchDel.remoteTitle': 'Удалить {name} на сервере?',
+  'branchDel.remoteBody': 'Ветка {branch} будет удалена в {remote} для всех, кто работает с репозиторием. Локальные копии у других останутся.',
+  'branchDel.remoteOk': 'Удалить на сервере',
+
   'files.title': 'Файлы',
   'files.path': 'Путь',
   'files.name': 'Имя',

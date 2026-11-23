@@ -8,7 +8,7 @@ require('fs').mkdirSync(OUT, { recursive: true });
   const browser = await chromium.launch();
   const errors = [];
   const watch = (page) => {
-    page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+    page.on('pageerror', (e) => { errors.push('pageerror: ' + e.message); console.log('pageerror:', e.message); });
     page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
   };
   const step = async (name, fn) => {
@@ -64,6 +64,8 @@ require('fs').mkdirSync(OUT, { recursive: true });
   await page.click('.right button[aria-label="Настройки локальной ФС"]');
 
   await step('drag two files to server: first conflict', async () => {
+    // коммиты приходят вторым запросом и перерисовывают таблицу: тащить строку после этого
+    await page.waitForSelector('.center .row:has-text("Wire auth middleware")');
     await page.click('.center .row:has-text("README.md")');
     await page.click('.center .row:has-text("server.go")', { modifiers: ['Control'] });
     await page.dragAndDrop('.center .row:has-text("server.go")', '.right .dropzone');
@@ -102,6 +104,23 @@ require('fs').mkdirSync(OUT, { recursive: true });
   await step('push error goes to output', async () => {
     await page.click('.topbar button:has-text("Push")');
     await page.waitForSelector('.dock .log-entry .cmd.bad:has-text("git push")');
+  });
+
+  await step('merge with conflict, then abort', async () => {
+    await page.click('.left .item:has-text("origin/release-2.1")', { button: 'right' });
+    await page.click('.menu button:has-text("Слить в feature/login")');
+    await page.waitForSelector('.dialog:has-text("конфликтах")');
+    await page.click('.dialog button:has-text("Отменить слияние")');
+    await page.waitForSelector('.log-entry .cmd.ok:has-text("git merge-abort")');
+  });
+  await step('delete unmerged branch asks twice', async () => {
+    await page.click('.left .item:has-text("fix/api-timeout")', { button: 'right' });
+    await page.click('.menu button:has-text("Удалить ветку…")');
+    await page.click('.dialog footer button:has-text("Удалить")');
+    await page.waitForSelector('.dialog:has-text("неслитые коммиты")');
+    await page.click('.dialog footer button:has-text("Удалить всё равно")');
+    await page.waitForSelector('.log-entry .cmd.ok:has-text("git branch -D fix/api-timeout")');
+    await page.waitForFunction(() => ![...document.querySelectorAll('.left .item')].some((e) => e.textContent.includes('fix/api-timeout')));
   });
 
   await step('file: edit, draft, save via Ctrl+S', async () => {

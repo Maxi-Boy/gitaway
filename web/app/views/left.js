@@ -62,8 +62,10 @@ function branchMenu(b, wt) {
     return [
       { label: t('branches.openTab'), run: () => act.openBranchTab(b) },
       { label: t('git.fetch'), run: () => act.gitOp('fetch', { remote: b.name.split('/')[0] }) },
+      state.wt?.branch ? { label: t('merge.into', { into: state.wt.branch }), run: () => act.merge(b.name) } : null,
       '-',
       { label: t('branches.copyName'), run: () => copyText(b.name) },
+      { label: t('branchDel.remoteMenu'), danger: true, run: () => act.deleteRemoteBranch(b.name) },
     ];
   }
   const current = state.wt?.branch === b.name;
@@ -75,6 +77,8 @@ function branchMenu(b, wt) {
     { label: t('git.pullFF'), disabled: !b.upstream, run: () => act.gitOp('update-branch', { branch: b.name }, wt || state.wt) },
     { label: t('git.push'), run: () => act.pushNamed(b) },
     '-',
+    state.wt?.branch && !current ? { label: t('merge.into', { into: state.wt.branch }), run: () => act.merge(b.name) } : null,
     { label: t('branches.copyName'), run: () => copyText(b.name) },
+    { label: wt ? t('branchDel.hasTab') : t('branchDel.menu'), danger: true, disabled: !!wt, run: () => act.deleteBranch(b.name) },
   ];
 }

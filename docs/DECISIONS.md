@@ -55,6 +55,8 @@
 | POST /api/git/discard | {repo, wt, paths}: вернуть к HEAD, новые файлы удалить (подтверждает интерфейс) |
 | POST /api/git/commit | {repo, wt, message}: коммит из индекса, ответ с хешем |
 | GET /api/diff?repo=&wt=&path=&staged=1 | diff файла (рабочая папка или индекс), до 1 МБ |
+| POST /api/git/merge, /merge-abort | {repo, wt, branch}: слить ветку в текущую; при конфликте 422, status.merging |
+| POST /api/git/delete-branch | {branch, force} локально (неслитая без force: 409 not_merged) или {remote, branch} на сервере |
 | GET/POST/DELETE /api/sessions | терминалы: список, новый {repo, wt} или {dir}, остановить ?id= |
 | GET /api/sessions/ws?id= | WebSocket сеанса: буфер вывода, затем живой поток |
 | GET /api/jobs/{id} | состояние и вывод задачи |

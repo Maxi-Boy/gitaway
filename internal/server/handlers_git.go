@@ -288,6 +288,7 @@ type opRequest struct {
 	Branch         string `json:"branch"`
 	SetUpstream    bool   `json:"set_upstream"`
 	ForceWithLease bool   `json:"force_with_lease"`
+	Force          bool   `json:"force"`
 }
 
 type gitOp func(ctx context.Context, dir string, q opRequest) (string, error)
@@ -355,5 +356,18 @@ func (s *Server) registerGit(mux *http.ServeMux) {
 	})
 	reg("/api/git/update-branch", func(ctx context.Context, dir string, q opRequest) (string, error) {
 		return s.git.UpdateBranch(ctx, dir, q.Branch)
+	})
+	reg("/api/git/merge", func(ctx context.Context, dir string, q opRequest) (string, error) {
+		return s.git.Merge(ctx, dir, q.Branch)
+	})
+	reg("/api/git/merge-abort", func(ctx context.Context, dir string, q opRequest) (string, error) {
+		return s.git.MergeAbort(ctx, dir)
+	})
+	// удаление ветки: локальной ({branch, force}) или на сервере ({remote, branch})
+	reg("/api/git/delete-branch", func(ctx context.Context, dir string, q opRequest) (string, error) {
+		if q.Remote != "" {
+			return s.git.DeleteRemoteBranch(ctx, dir, q.Remote, q.Branch)
+		}
+		return s.git.DeleteBranch(ctx, dir, q.Branch, q.Force)
 	})
 }

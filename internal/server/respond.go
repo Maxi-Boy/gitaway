@@ -59,6 +59,8 @@ func (s *Server) fail(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusBadRequest, "into_itself", "cannot copy a directory into itself")
 	case errors.Is(err, copyop.ErrInvalid):
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+	case errors.Is(err, gitx.ErrNotMerged):
+		writeError(w, http.StatusConflict, "not_merged", err.Error())
 	case errors.Is(err, session.ErrLimit):
 		writeError(w, http.StatusTooManyRequests, "too_many_sessions", "too many terminals are open; close one first")
 	case errors.Is(err, session.ErrNotFound):

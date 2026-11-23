@@ -96,6 +96,7 @@ type WorktreeStatus struct {
 	Behind   int      `json:"behind"`
 	Gone     bool     `json:"gone,omitempty"`
 	Detached bool     `json:"detached,omitempty"`
+	Merging  bool     `json:"merging,omitempty"` // идёт слияние (есть MERGE_HEAD)
 	Changes  []Change `json:"changes"`
 }
 
@@ -106,7 +107,11 @@ func (r *Runner) Status(ctx context.Context, dir string) (*WorktreeStatus, error
 	if err != nil {
 		return nil, err
 	}
-	return parseStatus(out), nil
+	st := parseStatus(out)
+	if _, err := r.RunEnv(ctx, dir, readOnlyEnv, "rev-parse", "-q", "--verify", "MERGE_HEAD"); err == nil {
+		st.Merging = true
+	}
+	return st, nil
 }
 
 func parseStatus(out string) *WorktreeStatus {

@@ -90,6 +90,8 @@ export function changesView(route) {
     const s = staged();
     const u = unstaged();
     mount(list,
+      state.status?.merging ? h('div', { class: 'notice field' }, h('span', { class: 'grow' }, t('merge.inProgress')),
+        h('button', { class: 'btn small danger', onclick: () => act.abortMerge() }, t('merge.abort'))) : null,
       h('div', { class: 'commit-box' }, msg, h('div', { class: 'field' }, commitBtn, h('span', { class: 'muted grow' }, t('changes.commitHint')))),
       h('div', { class: 'section-title field' }, h('span', { class: 'grow' }, t('changes.staged', { n: s.length })),
         s.length ? h('button', { class: 'btn small', onclick: () => act.unstage(['.']) }, t('changes.unstageAll')) : null),

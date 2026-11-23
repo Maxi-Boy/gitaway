@@ -63,6 +63,8 @@ const commits = {
 };
 const files = { 'README.md': '# myrepo\n\nПример файла.\n', 'server.go': 'package main\n\nfunc main() {\n\tprintln("hi")\n}\n' };
 let fileVer = 1;
+const merging = {};
+const forceNeeded = new Set(['fix/api-timeout']);
 const fsDirs = {
   [ROOT]: [{ name: 'export', is_dir: true, size: 0, mtime: now - 50 * H }, { name: 'myrepo', is_dir: true, size: 0, mtime: now - H }],
   [ROOT + '/export']: [
@@ -120,7 +122,7 @@ function status(wt) {
   const p = wt || ROOT + '/myrepo';
   const b = wts.find((w) => w.path === p);
   const br = branches.find((x) => x.name === b?.branch);
-  return { branch: b?.branch, upstream: br?.upstream, ahead: br?.ahead || 0, behind: br?.behind || 0, changes: changes[p] || [] };
+  return { branch: b?.branch, upstream: br?.upstream, ahead: br?.ahead || 0, behind: br?.behind || 0, changes: changes[p] || [], merging: !!merging[p] };
 }
 
 http.createServer(async (req, res) => {
@@ -216,6 +218,18 @@ http.createServer(async (req, res) => {
     if (op === 'discard') { changes[wt] = changes[wt].filter((c) => !b.paths.includes(c.path)); return json(res, 200, { discarded: b.paths, status: status(b.wt) }); }
     if (op === 'commit') { changes[wt] = changes[wt].filter((c) => c.x === ' ' || c.x === '?').map((c) => c); return json(res, 200, { commit: 'abcdef1234567890abcdef1234567890abcdef12', output: '[feature/login abcdef1] ' + b.message, status: status(b.wt) }); }
     if (op === 'push') return err(res, 422, 'git_failed', 'git push: exit 1: ! [rejected] feature/login -> feature/login (non-fast-forward)');
+    if (op === 'merge' && b.branch === 'origin/release-2.1') {
+      merging[wt] = true;
+      changes[wt] = [...changes[wt], { path: 'README.md', x: 'U', y: 'U' }];
+      return err(res, 422, 'git_failed', 'git merge: exit 1: CONFLICT (content): Merge conflict in README.md');
+    }
+    if (op === 'merge-abort') { merging[wt] = false; changes[wt] = changes[wt].filter((c) => c.x !== 'U'); return json(res, 200, { output: '' }); }
+    if (op === 'delete-branch' && !b.remote) {
+      if (forceNeeded.has(b.branch) && !b.force) return err(res, 409, 'not_merged', 'branch is not fully merged: ' + b.branch);
+      const i = branches.findIndex((x) => x.name === b.branch);
+      if (i >= 0) branches.splice(i, 1);
+      return json(res, 200, { output: 'Deleted branch ' + b.branch });
+    }
     return json(res, 200, { output: op === 'fetch' ? 'From github.com:Maxi-Boy/myrepo\n   1a2b3c..4d5e6f  main -> origin/main' : 'Already up to date.' });
   }
   err(res, 404, 'not_found', 'unknown API endpoint');
