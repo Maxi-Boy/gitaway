@@ -4,7 +4,8 @@
 import { h, mount, toast } from '../ui.js';
 import { t } from '../i18n.js';
 import { api } from '../api.js';
-import { state, wtParam } from '../store.js';
+import { state, wtParam, emit } from '../store.js';
+import { taskFinished } from './tasks.js';
 
 let xtermPromise = null;
 
@@ -41,11 +42,25 @@ export function terminalPanel(el) {
   let ctrl = false; // «залипающий» Ctrl для клавиатуры телефона
   let loaded = false;
 
+  // publish сообщает остальному интерфейсу о сеансах: значки на вкладках веток, список задач
+  const publish = () => {
+    state.sessions = [...terms.values()].map((s) => s.info);
+    emit('sessions');
+  };
+
+  const label = (info) => {
+    const name = (info.kind === 'task' ? '▶ ' : '') + (info.title || info.id.slice(0, 6));
+    if (info.running) return name;
+    if (info.kind === 'task') return [name, h('span', { class: info.exit_code === 0 ? 'ok' : 'bad' }, info.exit_code === 0 ? ' ✓' : ' ✗ ' + info.exit_code)];
+    return name + ' ' + t('term.exited', { code: info.exit_code });
+  };
+
   const renderTabs = () => {
+    publish();
     const list = [...terms.values()].map(({ info }) => h('button', {
       class: 't' + (info.id === active ? ' on' : ''), role: 'tab', 'aria-selected': String(info.id === active), title: info.dir,
       onclick: () => activate(info.id),
-    }, info.title || info.id.slice(0, 6), info.running ? '' : ' ' + t('term.exited', { code: info.exit_code }),
+    }, label(info),
     h('span', {
       class: 'x', role: 'button', 'aria-label': t('term.close'), title: t('term.close'),
       onclick: (e) => { e.stopPropagation(); closeSession(info.id); },
@@ -89,7 +104,9 @@ export function terminalPanel(el) {
           s.info.running = false;
           s.info.exit_code = m.code;
           s.closed = true;
-          s.term.write('\r\n\x1b[2m' + t('term.exitedLine', { code: m.code }) + '\x1b[0m\r\n');
+          if (s.info.kind !== 'task') s.term.write('\r\n\x1b[2m' + t('term.exitedLine', { code: m.code }) + '\x1b[0m\r\n');
+          else if (s.watched) taskFinished(s.info); // уведомлять только о том, что шло на глазах
+          s.watched = false;
           renderTabs();
         }
         return;
@@ -116,7 +133,7 @@ export function terminalPanel(el) {
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
     term.open(box);
-    const s = { info, term, fit: fitAddon, box, ws: null, closed: !info.running };
+    const s = { info, term, fit: fitAddon, box, ws: null, closed: !info.running, watched: info.running };
     term.onData((d) => {
       if (ctrl && d.length === 1) {
         const c = d.toUpperCase().charCodeAt(0);
@@ -202,8 +219,20 @@ export function terminalPanel(el) {
   new ResizeObserver(() => fit(terms.get(active))).observe(screens);
   renderTabs();
 
+  // open показывает уже запущенный сеанс (задачу): подключает и делает активным
+  const open = async (info) => {
+    try {
+      await attach(info);
+      activate(info.id);
+    } catch (err) {
+      toast(err.message || t('term.loadFailed'), { bad: true });
+    }
+  };
+
   return {
     show: () => { load(); fit(terms.get(active)); terms.get(active)?.term.focus(); },
+    preload: load,
     newSession,
+    open,
   };
 }

@@ -5,6 +5,7 @@ import { h, mount } from '../ui.js';
 import { t } from '../i18n.js';
 import { state, on, emit } from '../store.js';
 import { terminalPanel } from './terminal.js';
+import { tasksPane } from './tasks.js';
 
 const TABS = ['terminal', 'tasks', 'problems', 'output'];
 const KEY = 'gitaway:dock';
@@ -39,7 +40,8 @@ export function dock(el) {
   mount(el, grip, tabsEl, Object.values(panes));
   const term = terminalPanel(panes.terminal);
   panes.terminal.classList.add('term-pane');
-  mount(panes.tasks, h('div', { class: 'muted' }, t('dock.soon.tasks')));
+  const tasks = tasksPane(panes.tasks);
+  term.preload(); // сеансы, начатые раньше: значки задач на вкладках веток видны сразу
   mount(panes.problems, h('div', { class: 'muted' }, t('dock.soon.problems')));
 
   const applyHeight = () => {
@@ -95,6 +97,7 @@ export function dock(el) {
     for (const name of TABS) panes[name].hidden = collapsed || name !== tab;
     if (!collapsed && tab === 'output') renderOutput();
     if (!collapsed && tab === 'terminal') term.show();
+    if (!collapsed && tab === 'tasks') tasks.show();
   };
 
   on('log', () => { if (tab === 'output' && !collapsed) renderOutput(); else render(); });
@@ -102,5 +105,6 @@ export function dock(el) {
   return {
     show: (name) => { tab = name; collapsed = false; persist(); render(); },
     newTerminal: (body) => { tab = 'terminal'; collapsed = false; persist(); render(); return term.newSession(body); },
+    openSession: (info) => { tab = 'terminal'; collapsed = false; persist(); render(); return term.open(info); },
   };
 }

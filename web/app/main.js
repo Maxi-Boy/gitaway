@@ -13,6 +13,7 @@ import { dock } from './views/dock.js';
 import { serverPanel } from './views/server.js';
 import { registerTreeCommands } from './views/tree.js';
 import { currentEditor } from './views/editor.js';
+import { openTaskMenu, rerunLast } from './views/tasks.js';
 
 const app = document.getElementById('app');
 
@@ -136,6 +137,9 @@ function registerCommands() {
     return state.dock?.newTerminal();
   } });
   register({ id: 'term.show', title: t('cmd.terminal'), run: () => state.dock?.show('terminal') });
+  register({ id: 'task.menu', title: t('cmd.taskMenu'), run: () => openTaskMenu(document.querySelector('.task-btn')) });
+  register({ id: 'task.rerun', title: t('cmd.taskRerun'), keys: 'Ctrl+Shift+B', inTerminal: true, run: rerunLast });
+  register({ id: 'tasks.show', title: t('cmd.tasks'), run: () => state.dock?.show('tasks') });
   register({ id: 'tab.next', title: t('cmd.nextTab'), keys: 'Alt+PageDown', when: () => state.worktrees.length > 1, run: () => cycleTab(1) });
   register({ id: 'tab.prev', title: t('cmd.prevTab'), keys: 'Alt+PageUp', when: () => state.worktrees.length > 1, run: () => cycleTab(-1) });
   register({ id: 'logout', title: t('auth.logout'), run: async () => {

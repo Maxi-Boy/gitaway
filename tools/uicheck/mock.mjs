@@ -65,6 +65,10 @@ const files = { 'README.md': '# myrepo\n\nПример файла.\n', 'server.g
 let fileVer = 1;
 const merging = {};
 const forceNeeded = new Set(['fix/api-timeout']);
+let myTasks = [];
+let trusted = false;
+const repoTasks = [{ id: 'repo:0', name: 'Линтер', steps: ['golangci-lint run'] }];
+const autoTasks = [{ id: 'auto:go test', name: 'go test', steps: ['go test ./...'] }, { id: 'auto:make build', name: 'make build', steps: ['make build'] }];
 const fsDirs = {
   [ROOT]: [{ name: 'export', is_dir: true, size: 0, mtime: now - 50 * H }, { name: 'myrepo', is_dir: true, size: 0, mtime: now - H }],
   [ROOT + '/export']: [
@@ -201,6 +205,25 @@ http.createServer(async (req, res) => {
       }
       return json(res, 200, res2);
     }
+    case '/api/tasks':
+      return json(res, 200, { mine: myTasks, auto: q.repo ? autoTasks : [], repo: q.repo ? { tasks: repoTasks, hash: 'h1', trusted, error: '' } : null });
+    case '/api/tasks/mine':
+      if (req.method === 'PUT') myTasks = b.map((x, i) => ({ ...x, id: x.id || 'my:' + i + Date.now() }));
+      return json(res, 200, myTasks);
+    case '/api/tasks/trust':
+      if (b.hash !== 'h1') return err(res, 409, 'changed', 'changed');
+      trusted = true;
+      return json(res, 200, { trusted: true });
+    case '/api/tasks/run': {
+      const task = [...myTasks, ...repoTasks, ...autoTasks].find((x) => x.id === b.id);
+      if (!task) return err(res, 404, 'not_found', 'task not found');
+      if (task.id.startsWith('repo:') && !trusted) return err(res, 403, 'not_trusted', 'needs approval');
+      const lines = task.steps.map((s, i) => `\x1b[1;36m▶ ${i + 1}/${task.steps.length}: ${s}\x1b[0m\r\nok\r\n`).join('');
+      const info = { id: 's' + (sessions.length + 1), kind: 'task', title: task.name, dir: ROOT + '/myrepo', repo: b.repo, wt: b.wt, running: true, exit_code: 0, started: new Date().toISOString(), buf: lines, line: '', finishAt: Date.now() + 600, tail: '\x1b[32m✓ готово\x1b[0m\r\n' };
+      sessions.push(info);
+      const { buf, line, finishAt, tail, ...pub } = info;
+      return json(res, 201, pub);
+    }
     case '/api/sessions':
       if (req.method === 'POST') {
         const info = { id: 's' + (sessions.length + 1), title: b.repo ? 'feature-login' : 'export', dir: b.dir || ROOT + '/myrepo', running: true, exit_code: 0, buf: PROMPT, line: '' };
@@ -208,7 +231,7 @@ http.createServer(async (req, res) => {
         return json(res, 201, info);
       }
       if (req.method === 'DELETE') { const i = sessions.findIndex((x) => x.id === q.id); if (i < 0) return err(res, 404, 'not_found', 'session not found'); sessions.splice(i, 1); return json(res, 200, { ok: true }); }
-      return json(res, 200, sessions.map(({ buf, line, ...x }) => x));
+      return json(res, 200, sessions.map(({ buf, line, finishAt, tail, ...x }) => x));
   }
   if (p.startsWith('/api/git/')) {
     const op = p.slice(9);
@@ -241,6 +264,13 @@ http.createServer(async (req, res) => {
   sock.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ' + accept + '\r\n\r\n');
   const out = (text) => { sess.buf += text; sock.write(wsFrame(2, Buffer.from(text))); };
   sock.write(wsFrame(2, Buffer.from(sess.buf)));
+  if (sess.kind === 'task') {
+    const finish = () => {
+      if (sess.running) { sess.running = false; sess.buf += sess.tail; sock.write(wsFrame(2, Buffer.from(sess.tail))); }
+      sock.write(wsFrame(1, Buffer.from(JSON.stringify({ type: 'exit', code: sess.exit_code }))));
+    };
+    if (sess.running) setTimeout(finish, Math.max(0, sess.finishAt - Date.now())); else finish();
+  }
   let pending = Buffer.alloc(0);
   sock.on('data', (chunk) => {
     const { frames, rest } = wsParse(Buffer.concat([pending, chunk]));

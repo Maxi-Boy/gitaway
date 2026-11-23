@@ -182,6 +182,45 @@ require('fs').mkdirSync(OUT, { recursive: true });
     await page.waitForFunction(() => document.querySelector('.term-screen:not([hidden]) .xterm-rows')?.textContent.includes('/home/sysadmin/projects/myrepo'));
   });
 
+  await step('tasks: create my script in the editor', async () => {
+    await page.click('.task-btn');
+    await page.click('.menu button:has-text("Мои скрипты…")');
+    await page.click('.dialog footer button:has-text("Новый скрипт")');
+    await page.fill('.dialog input[aria-label="Название"]', 'Сборка и бэкап');
+    await page.fill('.dialog textarea[aria-label="Команды, по одной в строке"]', 'make build\ntar czf ~/b-{branch}.tgz bin/');
+    await page.click('.dialog footer button:has-text("Сохранить")');
+    await page.waitForSelector('.dialog .task-row:has-text("Сборка и бэкап")');
+  });
+  await page.screenshot({ path: OUT + '/13-scripts.png' });
+  await step('tasks: run from the menu, tab gets ✓', async () => {
+    await page.keyboard.press('Escape');
+    await page.click('.task-btn');
+    await page.waitForSelector('.menu .label:has-text("Найдены в проекте")');
+    await page.click('.menu button:has-text("Сборка и бэкап")');
+    await page.waitForSelector('.term-tabs .t.on:has-text("▶ Сборка и бэкап")');
+    await page.waitForSelector('.term-tabs .t.on .ok');
+    await page.waitForSelector('.tab.active .badge.ok');
+    await page.waitForFunction(() => document.querySelector('.term-screen:not([hidden]) .xterm-rows').textContent.includes('готово'));
+  });
+  await page.screenshot({ path: OUT + '/14-task-run.png' });
+  await step('tasks: repository task asks for trust first', async () => {
+    await page.click('.task-btn');
+    await page.click('.menu button:has-text("Линтер")');
+    await page.waitForSelector('.dialog:has-text("Доверять задачам этого репозитория?") li:has-text("golangci-lint run")');
+    await page.click('.dialog footer button:has-text("Доверять и запустить")');
+    await page.waitForSelector('.term-tabs .t.on:has-text("▶ Линтер")');
+  });
+  await step('tasks: Ctrl+Shift+B reruns the last task', async () => {
+    const before = await page.$$eval('.term-tabs .t', (els) => els.length);
+    await page.keyboard.press('Control+Shift+B');
+    await page.waitForFunction((n) => document.querySelectorAll('.term-tabs .t').length > n, before);
+  });
+  await step('tasks: dock tab lists runs', async () => {
+    await page.click('.dock-tabs .t:has-text("Задачи")');
+    await page.waitForSelector('.dock-body .link-row:has-text("Линтер")');
+  });
+  await page.screenshot({ path: OUT + '/15-tasks-tab.png' });
+
   // телефон
   const m = await browser.newContext({ ...devices['iPhone 13'] });
   const mp = await m.newPage();

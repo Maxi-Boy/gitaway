@@ -1,11 +1,12 @@
 // Верхняя панель (репозиторий, fetch/pull/push, связь, команды) и вкладки веток.
 import { h, mount, icon, menuAt, onContext, prompt, toast } from '../ui.js';
 import { t } from '../i18n.js';
-import { state, on, tabName } from '../store.js';
+import { state, on, tabName, wtParam } from '../store.js';
 import { events, isOnline } from '../api.js';
 import { run } from '../commands.js';
 import { go } from '../router.js';
 import * as act from '../actions.js';
+import { openTaskMenu } from './tasks.js';
 
 const base = (p) => p.split('/').filter(Boolean).pop() || p;
 
@@ -45,6 +46,8 @@ export function topbar(el) {
         t('git.pull'), st?.behind ? ' ↓' + st.behind : ''),
       h('button', { class: 'btn' + (st?.ahead ? ' primary' : ''), disabled: !has, onclick: () => run('git.push') },
         t('git.push'), st?.ahead ? ' ↑' + st.ahead : ''),
+      h('button', { class: 'btn task-btn', 'aria-haspopup': 'menu', title: t('tasks.button') + ' (Ctrl+Shift+B: ' + t('tasks.rerunShort') + ')',
+        onclick: (e) => openTaskMenu(e.currentTarget) }, '▶', h('span', { class: 'wide-only' }, ' ' + t('tasks.button'))),
       h('span', { class: 'grow' }),
       conn,
       h('button', { class: 'btn icon', title: t('palette.title') + ' (Ctrl+K)', 'aria-label': t('palette.title'), onclick: () => run('palette') }, icon('search')),
@@ -69,6 +72,15 @@ function repoMenu() {
 
 // --- вкладки веток ---
 
+// taskMark: последняя задача вкладки: ▶ идёт, ✓ успешно, ✗ с ошибкой.
+function taskMark(w) {
+  const runs = (state.sessions || []).filter((s) => s.kind === 'task' && s.repo === state.repo?.id && (s.wt || '') === wtParam(w));
+  const last = runs[runs.length - 1];
+  if (!last) return null;
+  if (last.running) return h('span', { class: 'badge', title: last.title }, '▶');
+  return h('span', { class: 'badge ' + (last.exit_code === 0 ? 'ok' : 'bad'), title: last.title }, last.exit_code === 0 ? '✓' : '✗');
+}
+
 function badge(st) {
   if (!st) return null;
   const parts = [];
@@ -89,7 +101,7 @@ export function tabs(el) {
         class: 'tab' + (active ? ' active' : ''), role: 'tab', 'aria-selected': String(active), title: w.path,
         onclick: () => go({ repo: state.repo.id, wt: name }),
         onauxclick: (e) => { if (e.button === 1) act.closeTab(w); },
-      }, h('span', {}, name), badge(state.wtStatus.get(w.path)),
+      }, h('span', {}, name), badge(state.wtStatus.get(w.path)), taskMark(w),
       w.main ? null : h('span', {
         class: 'x', role: 'button', 'aria-label': t('tab.close'), title: t('tab.close'),
         onclick: (e) => { e.stopPropagation(); act.closeTab(w); },
@@ -107,7 +119,7 @@ export function tabs(el) {
     const add = h('button', { class: 'btn small', 'aria-haspopup': 'menu', onclick: (e) => menuAt(e.currentTarget, openMenu()) }, t('tab.open'));
     mount(el, h('div', { role: 'tablist', style: { display: 'contents' } }, list), add);
   };
-  on('repo worktrees wt status', render);
+  on('repo worktrees wt status sessions', render);
   render();
 }
 
