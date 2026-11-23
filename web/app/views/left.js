@@ -8,17 +8,13 @@ import * as act from '../actions.js';
 import { repoName, copyText } from './top.js';
 
 export function left(el) {
+  // репозиторий выбирается в списке вверху; здесь только его ветки
   const render = () => {
-    const repos = state.repos.map((r) => h('button', {
-      class: 'item' + (r.id === state.repo?.id ? ' active' : ''),
-      onclick: () => go({ repo: r.id }),
-    }, h('span', { class: 'ellipsis' }, repoName(r)), r.remote ? h('span', { class: 'note ellipsis', style: { maxWidth: '50%' } }, r.remote.replace(/^.*[/:]/, '')) : null));
-    const parts = [
-      h('div', { class: 'section-title' }, t('repo.list')),
-      repos.length ? repos : h('div', { class: 'empty' }, t('repo.none')),
-      h('button', { class: 'item muted', onclick: () => run('repo.add') }, '+ ' + t('repo.add')),
-    ];
-    if (state.repo) {
+    const parts = [];
+    if (!state.repo) {
+      parts.push(h('div', { class: 'empty' }, state.repos.length ? t('branches.pickRepo') : t('repo.none')),
+        h('button', { class: 'item muted', onclick: () => run('repo.add') }, '+ ' + t('repo.add')));
+    } else {
       const local = state.branches.filter((b) => !b.remote);
       const remote = state.branches.filter((b) => b.remote);
       parts.push(h('div', { class: 'section-title' }, t('branches.title', { repo: repoName(state.repo) })),

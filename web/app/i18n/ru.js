@@ -89,6 +89,7 @@ export default {
   'tab.closeDirty': 'В рабочей папке есть незакоммиченные изменения ({n}). Они будут потеряны вместе с папкой. Ветка и коммиты останутся.',
 
   'branches.title': 'Ветки · {repo}',
+  'branches.pickRepo': 'Выберите репозиторий в списке вверху.',
   'branches.local': 'Локальные',
   'branches.remote': 'Удалённые',
   'branches.new': 'Новая ветка…',

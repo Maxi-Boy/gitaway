@@ -242,7 +242,8 @@ require('fs').mkdirSync(OUT, { recursive: true });
   await step('github: clone shows output and opens the new repository', async () => {
     await page.click('.dialog button:has-text("Клонировать")');
     await page.waitForSelector('.term-tabs .t.on:has-text("⇣ clone acme/widgets")');
-    await page.waitForSelector('.left .item:has-text("widgets")');
+    await page.waitForSelector('.topbar button:has-text("widgets")');
+    if (await page.$('.left .item:has-text("myrepo")')) throw new Error('repositories must not be listed on the left');
     await page.waitForFunction(() => decodeURIComponent(location.hash).includes('/repo/r3'));
   });
   await page.screenshot({ path: OUT + '/17-cloned.png' });
