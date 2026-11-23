@@ -20,6 +20,13 @@ export default {
   'auth.tooMany': 'Too many attempts. Wait a few minutes.',
   'auth.unavailable': 'Sign-in is unavailable: check the PAM service on the server (see the gitaway log).',
 
+  'theme.title': 'Theme',
+  'theme.auto': 'System',
+  'theme.light': 'Light',
+  'theme.dark': 'Dark',
+  'cmd.themeLight': 'Theme: light',
+  'cmd.themeDark': 'Theme: dark',
+  'cmd.themeAuto': 'Theme: system',
   'lang.title': 'Language',
   'lang.ru': 'Русский',
   'lang.en': 'English',

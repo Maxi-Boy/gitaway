@@ -252,6 +252,7 @@ require('fs').mkdirSync(OUT, { recursive: true });
   // быстрое открытие, поиск по проекту, история
   await page.goto(URL + '#/repo/r1/wt/feature%2Flogin');
   await page.waitForSelector('.center .row:has-text("server.go")');
+  await page.click('.center .row:has-text("README.md")'); // фокус из терминала: там Ctrl+P остаётся оболочке
   await step('quick open: Ctrl+P finds a file by part of the name', async () => {
     await page.keyboard.press('Control+P');
     await page.waitForSelector('.dialog.palette:has-text("Открыть файл")');
@@ -296,6 +297,7 @@ require('fs').mkdirSync(OUT, { recursive: true });
     await page.waitForSelector('.cfile-head:has-text("auth/login.go → auth/pam.go")');
     await page.click('.commit-meta .linkish');
     await page.waitForSelector('.commit-detail h3:has-text("Initial commit")');
+    await page.focus('.commit-row.sel');
     await page.keyboard.press('ArrowUp');
     await page.waitForSelector('.commit-detail h3:has-text("Wire auth middleware")');
   });
@@ -321,8 +323,40 @@ require('fs').mkdirSync(OUT, { recursive: true });
   await step('auth: connect the key, pull works', async () => {
     await page.click('.dialog button:text-is("Подключить")');
     await page.waitForSelector('.toast:has-text("Ключ подключён")');
+  });
+  await step('auth: pull after the key', async () => {
     await page.click('.topbar button:has-text("Pull")');
+    await page.click('.dock-tabs .t:has-text("Вывод")'); // удачные операции не открывают «Вывод» сами
     await page.waitForSelector('.log-entry .cmd.ok:has-text("git pull")');
+  });
+
+  // светлая тема: выбор в меню пользователя, редактор и терминал перекрашиваются без перезагрузки
+  await step('theme: light from the user menu', async () => {
+    await page.goto(URL + '#/repo/r1/wt/feature%2Flogin');
+    await page.waitForSelector('.center .row:has-text("server.go")');
+    await page.click('.topbar button:has-text("sysadmin@nvme-lab")');
+    await page.click('.menu button:has-text("Светлая")');
+    await page.waitForFunction(() => document.documentElement.dataset.theme === 'light');
+    const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    if (bg === 'rgb(255, 255, 255)') throw new Error('light theme must not be pure white');
+  });
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: OUT + '/23-light.png' });
+  await step('theme: light editor and terminal', async () => {
+    await page.dblclick('.row:has-text("server.go")');
+    await page.waitForSelector('.cm-editor');
+    await page.keyboard.press('Control+`');
+    await page.waitForSelector('.term-screen:not([hidden]) .xterm');
+  });
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: OUT + '/24-light-editor.png' });
+  await step('theme: kept after reload, back to dark', async () => {
+    await page.reload();
+    await page.waitForSelector('.topbar');
+    if (await page.evaluate(() => document.documentElement.dataset.theme) !== 'light') throw new Error('theme not kept');
+    await page.click('.topbar button:has-text("sysadmin@nvme-lab")');
+    await page.click('.menu button:has-text("Тёмная")');
+    await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
   });
 
   // телефон

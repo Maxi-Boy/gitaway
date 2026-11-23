@@ -7,6 +7,7 @@ import { api } from '../api.js';
 import { state, wtParam, emit } from '../store.js';
 import { taskFinished } from './tasks.js';
 import { cloneFinished } from './addrepo.js';
+import { appliedTheme } from '../theme.js';
 
 let xtermPromise = null;
 
@@ -23,12 +24,23 @@ function loadXterm() {
   return xtermPromise;
 }
 
-const THEME = {
-  background: '#0b0f14', foreground: '#c9d1d9', cursor: '#c9d1d9', selectionBackground: '#264f78',
-  black: '#484f58', red: '#ff7b72', green: '#3fb950', yellow: '#d29922', blue: '#58a6ff', magenta: '#bc8cff',
-  cyan: '#39c5cf', white: '#b1bac4', brightBlack: '#6e7681', brightRed: '#ffa198', brightGreen: '#56d364',
-  brightYellow: '#e3b341', brightBlue: '#79c0ff', brightMagenta: '#d2a8ff', brightCyan: '#56d4dd', brightWhite: '#f0f6fc',
+// Палитры терминала: xterm.js рисует на canvas и не видит CSS-переменных. В светлой теме
+// «белый» тёмно-серый, иначе белый текст программ пропал бы на светлом фоне.
+const THEMES = {
+  dark: {
+    background: '#0b0f14', foreground: '#c9d1d9', cursor: '#c9d1d9', selectionBackground: '#264f78',
+    black: '#484f58', red: '#ff7b72', green: '#3fb950', yellow: '#d29922', blue: '#58a6ff', magenta: '#bc8cff',
+    cyan: '#39c5cf', white: '#b1bac4', brightBlack: '#6e7681', brightRed: '#ffa198', brightGreen: '#56d364',
+    brightYellow: '#e3b341', brightBlue: '#79c0ff', brightMagenta: '#d2a8ff', brightCyan: '#56d4dd', brightWhite: '#f0f6fc',
+  },
+  light: {
+    background: '#f8f6f2', foreground: '#2b2e33', cursor: '#2b2e33', cursorAccent: '#f8f6f2', selectionBackground: '#c8d8ee',
+    black: '#2b2e33', red: '#be3a2c', green: '#2a7a39', yellow: '#8a5f00', blue: '#1d5fb8', magenta: '#7444c8',
+    cyan: '#16707c', white: '#6e7681', brightBlack: '#5f6670', brightRed: '#a8291d', brightGreen: '#1f6a2c',
+    brightYellow: '#6f4c00', brightBlue: '#134a92', brightMagenta: '#5d34a8', brightCyan: '#0f5b65', brightWhite: '#8a9099',
+  },
 };
+const termTheme = () => THEMES[appliedTheme()];
 
 const enc = new TextEncoder();
 const touch = matchMedia('(pointer: coarse)').matches;
@@ -39,6 +51,9 @@ export function terminalPanel(el) {
   const keys = touch ? h('div', { class: 'term-keys', 'aria-label': t('term.keys') }) : null;
   mount(el, tabs, screens, keys);
   const terms = new Map(); // id -> {info, term, fit, box, ws, closed}
+  addEventListener('gitaway:theme', () => {
+    for (const s of terms.values()) s.term.options.theme = termTheme();
+  });
   let active = null;
   let ctrl = false; // «залипающий» Ctrl для клавиатуры телефона
   let loaded = false;
@@ -130,7 +145,7 @@ export function terminalPanel(el) {
     screens.append(box);
     const term = new Terminal({
       fontFamily: getComputedStyle(document.body).getPropertyValue('--mono'), fontSize: 13, cursorBlink: true,
-      scrollback: 5000, theme: THEME, allowProposedApi: false,
+      scrollback: 5000, theme: termTheme(), allowProposedApi: false,
     });
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);

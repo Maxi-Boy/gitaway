@@ -6,6 +6,7 @@ import { t, phrases } from '../i18n.js';
 import { api } from '../api.js';
 import { state, wtParam } from '../store.js';
 import * as act from '../actions.js';
+import { appliedTheme } from '../theme.js';
 
 let cmPromise = null;
 
@@ -42,21 +43,22 @@ function languageFor(cm, path) {
   return byExt[ext] || null;
 }
 
-// Тема под цвета интерфейса: всё через CSS-переменные из style.css.
+// Тема под цвета интерфейса: всё через CSS-переменные из style.css, поэтому смена
+// светлой и тёмной темы перекрашивает и открытый редактор.
 function theme(cm) {
   const view = cm.EditorView.theme({
     '&': { height: '100%', backgroundColor: 'var(--bg-deep)', color: 'var(--text)', fontSize: '13px' },
     '.cm-scroller': { fontFamily: 'var(--mono)', lineHeight: '1.55' },
     '.cm-content': { caretColor: 'var(--text)' },
     '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--text)' },
-    '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': { backgroundColor: 'rgba(56, 139, 253, .35)' },
+    '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': { backgroundColor: 'var(--cm-sel)' },
     '.cm-gutters': { backgroundColor: 'var(--bg-deep)', color: 'var(--muted)', border: 'none' },
-    '.cm-activeLine': { backgroundColor: 'rgba(110, 118, 129, .1)' },
-    '.cm-activeLineGutter': { backgroundColor: 'rgba(110, 118, 129, .1)', color: 'var(--text)' },
-    '.cm-matchingBracket': { backgroundColor: 'rgba(63, 185, 80, .25)', outline: 'none' },
-    '.cm-selectionMatch': { backgroundColor: 'rgba(210, 153, 34, .2)' },
-    '.cm-searchMatch': { backgroundColor: 'rgba(210, 153, 34, .35)' },
-    '.cm-searchMatch-selected': { backgroundColor: 'rgba(210, 153, 34, .6)' },
+    '.cm-activeLine': { backgroundColor: 'var(--cm-line)' },
+    '.cm-activeLineGutter': { backgroundColor: 'var(--cm-line)', color: 'var(--text)' },
+    '.cm-matchingBracket': { backgroundColor: 'var(--add-bg)', outline: '1px solid var(--good)' },
+    '.cm-selectionMatch': { backgroundColor: 'var(--mark-bg)' },
+    '.cm-searchMatch': { backgroundColor: 'var(--mark-bg)' },
+    '.cm-searchMatch-selected': { backgroundColor: 'var(--mark-bg)', outline: '1px solid var(--warn)' },
     '.cm-panels': { backgroundColor: 'var(--panel)', color: 'var(--text)', borderColor: 'var(--line)', fontSize: '13px' },
     '.cm-panel.cm-search': { padding: '6px 10px' },
     '.cm-panel input, .cm-panel button, .cm-panel label': { fontSize: '13px' },
@@ -64,21 +66,21 @@ function theme(cm) {
     '.cm-textfield': { backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: '4px', color: 'var(--text)' },
     '.cm-button': { backgroundImage: 'none', backgroundColor: 'var(--ctl)', border: '1px solid var(--ctl-line)', borderRadius: '4px', color: 'var(--text)' },
     '.cm-foldPlaceholder': { backgroundColor: 'var(--ctl)', border: 'none', color: 'var(--muted)' },
-  }, { dark: true });
+  }, { dark: appliedTheme() === 'dark' });
   const tg = cm.tags;
   const hl = cm.HighlightStyle.define([
-    { tag: [tg.keyword, tg.controlKeyword, tg.moduleKeyword, tg.operatorKeyword], color: '#ff7b72' },
-    { tag: [tg.string, tg.special(tg.string), tg.regexp], color: '#a5d6ff' },
-    { tag: [tg.comment, tg.lineComment, tg.blockComment], color: '#8b949e', fontStyle: 'italic' },
-    { tag: [tg.number, tg.bool, tg.atom, tg.null], color: '#79c0ff' },
-    { tag: [tg.typeName, tg.className, tg.namespace], color: '#ffa657' },
-    { tag: [tg.function(tg.variableName), tg.definition(tg.variableName), tg.definition(tg.propertyName)], color: '#d2a8ff' },
-    { tag: [tg.propertyName, tg.attributeName], color: '#79c0ff' },
-    { tag: [tg.tagName, tg.heading], color: '#7ee787' },
-    { tag: [tg.meta, tg.processingInstruction, tg.annotation], color: '#8b949e' },
-    { tag: tg.inserted, color: '#7ee787', backgroundColor: 'rgba(63, 185, 80, .15)' },
-    { tag: tg.deleted, color: '#ffa198', backgroundColor: 'rgba(255, 123, 114, .15)' },
-    { tag: tg.invalid, color: '#ff7b72' },
+    { tag: [tg.keyword, tg.controlKeyword, tg.moduleKeyword, tg.operatorKeyword], color: 'var(--syn-kw)' },
+    { tag: [tg.string, tg.special(tg.string), tg.regexp], color: 'var(--syn-str)' },
+    { tag: [tg.comment, tg.lineComment, tg.blockComment], color: 'var(--syn-com)', fontStyle: 'italic' },
+    { tag: [tg.number, tg.bool, tg.atom, tg.null], color: 'var(--syn-num)' },
+    { tag: [tg.typeName, tg.className, tg.namespace], color: 'var(--syn-type)' },
+    { tag: [tg.function(tg.variableName), tg.definition(tg.variableName), tg.definition(tg.propertyName)], color: 'var(--syn-fn)' },
+    { tag: [tg.propertyName, tg.attributeName], color: 'var(--syn-num)' },
+    { tag: [tg.tagName, tg.heading], color: 'var(--syn-tag)' },
+    { tag: [tg.meta, tg.processingInstruction, tg.annotation], color: 'var(--syn-com)' },
+    { tag: tg.inserted, color: 'var(--syn-tag)', backgroundColor: 'var(--add-bg)' },
+    { tag: tg.deleted, color: 'var(--syn-del)', backgroundColor: 'var(--del-bg)' },
+    { tag: tg.invalid, color: 'var(--bad)' },
   ]);
   return [view, cm.syntaxHighlighting(hl)];
 }

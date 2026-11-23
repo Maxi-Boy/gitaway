@@ -19,6 +19,13 @@ export default {
   'auth.tooMany': 'Слишком много попыток. Подождите несколько минут.',
   'auth.unavailable': 'Вход недоступен: проверьте сервис PAM на сервере (подробности в журнале gitaway).',
 
+  'theme.title': 'Тема',
+  'theme.auto': 'Как в системе',
+  'theme.light': 'Светлая',
+  'theme.dark': 'Тёмная',
+  'cmd.themeLight': 'Тема: светлая',
+  'cmd.themeDark': 'Тема: тёмная',
+  'cmd.themeAuto': 'Тема: как в системе',
   'lang.title': 'Язык',
   'lang.ru': 'Русский',
   'lang.en': 'English',

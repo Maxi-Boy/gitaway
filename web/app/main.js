@@ -18,6 +18,7 @@ import { selectedTask, runTask, editMine, rerunLast } from './views/tasks.js';
 import { quickOpen } from './views/quickopen.js';
 import { setSearchPrefill, editorSelection } from './views/search.js';
 import { attachKeyDialog } from './views/addrepo.js';
+import { setTheme, themeMode } from './theme.js';
 
 const app = document.getElementById('app');
 
@@ -163,6 +164,9 @@ function registerCommands() {
       location.reload();
     }
   } });
+  register({ id: 'theme.light', title: t('cmd.themeLight'), when: () => themeMode() !== 'light', run: () => setTheme('light') });
+  register({ id: 'theme.dark', title: t('cmd.themeDark'), when: () => themeMode() !== 'dark', run: () => setTheme('dark') });
+  register({ id: 'theme.auto', title: t('cmd.themeAuto'), when: () => themeMode() !== 'auto', run: () => setTheme('auto') });
   register({ id: 'lang.ru', title: t('cmd.langRu'), when: () => lang !== 'ru', run: () => setLang('ru') });
   register({ id: 'lang.en', title: t('cmd.langEn'), when: () => lang !== 'en', run: () => setLang('en') });
   registerTreeCommands(register);

@@ -1,6 +1,7 @@
 // Верхняя панель (репозиторий, fetch/pull/push, связь, команды) и вкладки веток.
 import { h, mount, icon, menuAt, onContext, prompt, toast } from '../ui.js';
 import { t, lang, languages, setLang } from '../i18n.js';
+import { themes, themeMode, setTheme } from '../theme.js';
 import { state, on, tabName, wtParam } from '../store.js';
 import { events, isOnline } from '../api.js';
 import { run } from '../commands.js';
@@ -35,6 +36,8 @@ export function topbar(el) {
       onclick: () => run('fs.toggle'),
     }, state.fsOpen ? t('fs.hide') : t('fs.show'));
     const userBtn = h('button', { class: 'btn wide-only', 'aria-haspopup': 'menu', onclick: (e) => menuAt(e.currentTarget, [
+      { section: t('theme.title') },
+      ...themes.map((m) => ({ label: (m === themeMode() ? '✓ ' : '') + t('theme.' + m), run: () => setTheme(m) })),
       { section: t('lang.title') },
       ...languages.map((l) => ({ label: (l === lang ? '✓ ' : '') + t('lang.' + l), run: () => setLang(l) })),
       '-',
