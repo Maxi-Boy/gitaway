@@ -1,5 +1,5 @@
 // Точка входа: вход, каркас экрана, команды, маршрут.
-import { h, mount, prompt, toast } from './ui.js';
+import { h, mount, toast } from './ui.js';
 import { t } from './i18n.js';
 import { api, setCSRF, events } from './api.js';
 import { state, on, emit } from './store.js';
@@ -13,6 +13,7 @@ import { dock } from './views/dock.js';
 import { serverPanel } from './views/server.js';
 import { registerTreeCommands } from './views/tree.js';
 import { currentEditor } from './views/editor.js';
+import { addRepoDialog } from './views/addrepo.js';
 import { selectedTask, runTask, editMine, rerunLast } from './views/tasks.js';
 
 const app = document.getElementById('app');
@@ -117,16 +118,7 @@ function registerCommands() {
     setFs(!state.fsOpen);
     if (innerWidth < 900) setPane(state.fsOpen ? 'right' : 'center');
   } });
-  register({ id: 'repo.add', title: t('repo.add'), run: async () => {
-    const roots = (state.me?.roots || []).join(', ');
-    const path = await prompt(t('repo.add'), t('repo.addHint', { roots }), state.me?.roots?.[0] ? state.me.roots[0] + '/' : '');
-    if (!path) return;
-    try {
-      await act.addRepo(path);
-    } catch (err) {
-      toast({ duplicate: t('repo.duplicate'), outside_roots: t('repo.outside') }[err.code] || err.message, { bad: true });
-    }
-  } });
+  register({ id: 'repo.add', title: t('repo.add'), run: () => addRepoDialog() });
   register({ id: 'branch.new', title: t('branches.new'), when: () => !!state.repo, run: newBranch });
   register({ id: 'view.files', title: t('cmd.files'), when: hasWt, run: () => act.nav({ view: 'tree', path: '' }) });
   register({ id: 'view.changes', title: t('cmd.changes'), keys: 'Ctrl+Shift+G', when: hasWt, run: () => act.nav({ view: 'changes', path: '' }) });

@@ -304,6 +304,13 @@ body:not(.fs-open) .right { display: none; }
 .form textarea { width: 100%; resize: vertical; }
 .steps { margin: 0; padding-left: 22px; font-size: 12px; }
 
+/* добавление репозитория */
+.key-box { width: 100%; resize: none; font-size: 12px; word-break: break-all; white-space: pre-wrap; }
+.dialog ul.hint-list { margin: 0; padding-left: 18px; font-size: 12px; color: var(--muted); font-family: var(--sans); max-height: none; }
+.check-status { min-height: 1.4em; }
+.check-out { margin: 6px 0 0; padding: 8px 10px; background: var(--bg-deep); border-radius: 6px; font: 12px/1.45 var(--mono); white-space: pre-wrap; color: var(--muted); }
+a.btn { text-decoration: none; }
+
 /* нижняя навигация телефона */
 .mnav { display: none; }
 

@@ -66,6 +66,8 @@ let fileVer = 1;
 const merging = {};
 const forceNeeded = new Set(['fix/api-timeout']);
 let myTasks = [];
+let ghChecks = 0;
+const ghKey = { key_id: 'acme-widgets-1', owner: 'acme', repo: 'widgets', public_key: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleExampleExampleExampleExampleExampleEx gitaway@nvme-lab acme/widgets', keys_url: 'https://github.com/acme/widgets/settings/keys/new', title: 'gitaway@nvme-lab', transport: '' };
 let trusted = false;
 const repoTasks = [{ id: 'repo:0', name: 'Линтер', steps: ['golangci-lint run'] }];
 const autoTasks = [{ id: 'auto:go test', name: 'go test', steps: ['go test ./...'] }, { id: 'auto:make build', name: 'make build', steps: ['make build'] }];
@@ -154,7 +156,7 @@ http.createServer(async (req, res) => {
     case '/api/logout': logged = false; return json(res, 200, { ok: true });
     case '/api/repos': return json(res, 200, repos);
     case '/api/settings': if (req.method === 'PUT') settings = { ...settings, ...b }; return json(res, 200, settings);
-    case '/api/worktrees': return json(res, 200, q.repo === 'r1' ? wts : [{ path: repos[1].path, branch: 'main', main: true }]);
+    case '/api/worktrees': return json(res, 200, q.repo === 'r1' ? wts : [{ path: (repos.find((r) => r.id === q.repo) || repos[1]).path, branch: 'main', main: true }]);
     case '/api/branches': return json(res, 200, q.repo === 'r1' ? branches : [branches[0]]);
     case '/api/status': return json(res, 200, status(q.wt));
     case '/api/tree': {
@@ -205,6 +207,23 @@ http.createServer(async (req, res) => {
       }
       return json(res, 200, res2);
     }
+    case '/api/github/key':
+      if (!/^(https:\/\/github\.com\/)?[\w-]+\/[\w.-]+/.test(b.url)) return err(res, 400, 'bad_request', 'not a github.com repository address');
+      return json(res, 200, ghKey);
+    case '/api/github/check':
+      ghChecks++;
+      if (ghChecks === 1) return json(res, 200, { ok: false, code: 'denied', output: 'git@github.com: Permission denied (publickey).' });
+      ghKey.transport = 'ssh443';
+      return json(res, 200, { ok: true, transport: 'ssh443', branches: 3 });
+    case '/api/github/clone': {
+      if (b.key_id && !ghKey.transport) return err(res, 409, 'not_checked', 'check first');
+      const info = { id: 's' + (sessions.length + 1), kind: 'clone', title: 'clone acme/widgets', dir: ROOT, repo: '', wt: '', running: true, exit_code: 0, started: new Date().toISOString(),
+        buf: "Cloning into '" + b.dest + "'...\r\nReceiving objects: 100% (42/42), done.\r\n", line: '', finishAt: Date.now() + 500, tail: '',
+        onDone: () => { if (!repos.some((r) => r.path === b.dest)) repos.push({ id: 'r' + (repos.length + 1), path: b.dest, remote: 'https://github.com/acme/widgets.git' }); } };
+      sessions.push(info);
+      const { buf, line, finishAt, tail, onDone, ...pub } = info;
+      return json(res, 201, { session: pub, dest: b.dest });
+    }
     case '/api/tasks':
       return json(res, 200, { mine: myTasks, auto: q.repo ? autoTasks : [], repo: q.repo ? { tasks: repoTasks, hash: 'h1', trusted, error: '' } : null });
     case '/api/tasks/mine':
@@ -231,7 +250,7 @@ http.createServer(async (req, res) => {
         return json(res, 201, info);
       }
       if (req.method === 'DELETE') { const i = sessions.findIndex((x) => x.id === q.id); if (i < 0) return err(res, 404, 'not_found', 'session not found'); sessions.splice(i, 1); return json(res, 200, { ok: true }); }
-      return json(res, 200, sessions.map(({ buf, line, finishAt, tail, ...x }) => x));
+      return json(res, 200, sessions.map(({ buf, line, finishAt, tail, onDone, ...x }) => x));
   }
   if (p.startsWith('/api/git/')) {
     const op = p.slice(9);
@@ -264,9 +283,9 @@ http.createServer(async (req, res) => {
   sock.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ' + accept + '\r\n\r\n');
   const out = (text) => { sess.buf += text; sock.write(wsFrame(2, Buffer.from(text))); };
   sock.write(wsFrame(2, Buffer.from(sess.buf)));
-  if (sess.kind === 'task') {
+  if (sess.kind === 'task' || sess.kind === 'clone') {
     const finish = () => {
-      if (sess.running) { sess.running = false; sess.buf += sess.tail; sock.write(wsFrame(2, Buffer.from(sess.tail))); }
+      if (sess.running) { sess.running = false; sess.buf += sess.tail; if (sess.tail) sock.write(wsFrame(2, Buffer.from(sess.tail))); sess.onDone?.(); }
       sock.write(wsFrame(1, Buffer.from(JSON.stringify({ type: 'exit', code: sess.exit_code }))));
     };
     if (sess.running) setTimeout(finish, Math.max(0, sess.finishAt - Date.now())); else finish();

@@ -6,6 +6,7 @@ import { t } from '../i18n.js';
 import { api } from '../api.js';
 import { state, wtParam, emit } from '../store.js';
 import { taskFinished } from './tasks.js';
+import { cloneFinished } from './addrepo.js';
 
 let xtermPromise = null;
 
@@ -49,9 +50,9 @@ export function terminalPanel(el) {
   };
 
   const label = (info) => {
-    const name = (info.kind === 'task' ? '▶ ' : '') + (info.title || info.id.slice(0, 6));
+    const name = ({ task: '▶ ', clone: '⇣ ' }[info.kind] || '') + (info.title || info.id.slice(0, 6));
     if (info.running) return name;
-    if (info.kind === 'task') return [name, h('span', { class: info.exit_code === 0 ? 'ok' : 'bad' }, info.exit_code === 0 ? ' ✓' : ' ✗ ' + info.exit_code)];
+    if (info.kind === 'task' || info.kind === 'clone') return [name, h('span', { class: info.exit_code === 0 ? 'ok' : 'bad' }, info.exit_code === 0 ? ' ✓' : ' ✗ ' + info.exit_code)];
     return name + ' ' + t('term.exited', { code: info.exit_code });
   };
 
@@ -104,8 +105,9 @@ export function terminalPanel(el) {
           s.info.running = false;
           s.info.exit_code = m.code;
           s.closed = true;
-          if (s.info.kind !== 'task') s.term.write('\r\n\x1b[2m' + t('term.exitedLine', { code: m.code }) + '\x1b[0m\r\n');
-          else if (s.watched) taskFinished(s.info); // уведомлять только о том, что шло на глазах
+          if (s.info.kind === 'shell' || !s.info.kind) s.term.write('\r\n\x1b[2m' + t('term.exitedLine', { code: m.code }) + '\x1b[0m\r\n');
+          else if (s.watched && s.info.kind === 'task') taskFinished(s.info); // уведомлять только о том, что шло на глазах
+          else if (s.watched && s.info.kind === 'clone') cloneFinished(s.info);
           s.watched = false;
           renderTabs();
         }

@@ -224,6 +224,29 @@ require('fs').mkdirSync(OUT, { recursive: true });
   });
   await page.screenshot({ path: OUT + '/15-tasks-tab.png' });
 
+  await step('github: add repository with a deploy key', async () => {
+    await page.click('.topbar button:has-text("myrepo")');
+    await page.click('.menu button:has-text("Добавить репозиторий…")');
+    await page.fill('.dialog input[aria-label="Адрес репозитория на GitHub"]', 'https://github.com/acme/widgets');
+    const dest = await page.inputValue('.dialog input[aria-label="Куда клонировать на сервере"]');
+    if (!dest.endsWith('/widgets')) throw new Error('folder not suggested: ' + dest);
+    await page.click('.dialog button:has-text("Далее")');
+    await page.waitForSelector('.dialog textarea.key-box');
+    await page.waitForSelector('.dialog a[href="https://github.com/acme/widgets/settings/keys/new"]');
+    await page.click('.dialog button:has-text("Проверить доступ")');
+    await page.waitForSelector('.dialog .bad:has-text("не принял ключ")');
+    await page.click('.dialog button:has-text("Проверить доступ")');
+    await page.waitForSelector('.dialog .ok:has-text("через порт 443")');
+  });
+  await page.screenshot({ path: OUT + '/16-github-key.png' });
+  await step('github: clone shows output and opens the new repository', async () => {
+    await page.click('.dialog button:has-text("Клонировать")');
+    await page.waitForSelector('.term-tabs .t.on:has-text("⇣ clone acme/widgets")');
+    await page.waitForSelector('.left .item:has-text("widgets")');
+    await page.waitForFunction(() => decodeURIComponent(location.hash).includes('/repo/r3'));
+  });
+  await page.screenshot({ path: OUT + '/17-cloned.png' });
+
   // телефон
   const m = await browser.newContext({ ...devices['iPhone 13'] });
   const mp = await m.newPage();
