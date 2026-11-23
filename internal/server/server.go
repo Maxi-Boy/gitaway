@@ -116,7 +116,7 @@ func (s *Server) Handler() http.Handler {
 		writeError(w, http.StatusNotFound, "not_found", "unknown API endpoint")
 	})
 	if s.web != nil {
-		mux.Handle("/", http.FileServer(http.FS(s.web)))
+		mux.Handle("/", newStatic(s.web))
 	}
 	return s.withHeaders(s.withLog(s.withAllow(mux)))
 }
