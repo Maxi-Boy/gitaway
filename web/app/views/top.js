@@ -1,8 +1,8 @@
 // Верхняя панель (репозиторий, fetch/pull/push, связь, команды) и вкладки веток.
-import { h, mount, icon, menuAt, onContext, prompt, toast } from '../ui.js';
+import { h, mount, icon, menuAt, prompt, toast } from '../ui.js';
 import { t, lang, languages, setLang } from '../i18n.js';
 import { themes, themeMode, setTheme } from '../theme.js';
-import { state, on, tabName, wtParam } from '../store.js';
+import { state, on, wtParam } from '../store.js';
 import { events, isOnline } from '../api.js';
 import { run } from '../commands.js';
 import { go } from '../router.js';
@@ -82,7 +82,7 @@ function repoMenu() {
 // --- вкладки веток ---
 
 // taskMark: последняя задача вкладки: ▶ идёт, ✓ успешно, ✗ с ошибкой.
-function taskMark(w) {
+export function taskMark(w) {
   const runs = (state.sessions || []).filter((s) => s.kind === 'task' && s.repo === state.repo?.id && (s.wt || '') === wtParam(w));
   const last = runs[runs.length - 1];
   if (!last) return null;
@@ -90,61 +90,16 @@ function taskMark(w) {
   return h('span', { class: 'badge ' + (last.exit_code === 0 ? 'ok' : 'bad'), title: last.title }, last.exit_code === 0 ? '✓' : '✗');
 }
 
-function badge(st) {
+export function badge(st) {
   if (!st) return null;
   const parts = [];
   if (st.changes?.length) parts.push('● ' + st.changes.length);
   if (st.ahead) parts.push('↑' + st.ahead);
   if (st.behind) parts.push('↓' + st.behind);
-  // место под состояние задачи (идёт, ✓, ✗) появится вместе с сеансами
   return parts.length ? h('span', { class: 'badge' }, parts.join(' ')) : null;
 }
 
-export function tabs(el) {
-  const render = () => {
-    if (!state.repo) return mount(el);
-    const list = state.worktrees.map((w) => {
-      const name = tabName(w);
-      const active = state.wt?.path === w.path;
-      const tab = h('button', {
-        class: 'tab' + (active ? ' active' : ''), role: 'tab', 'aria-selected': String(active), title: w.path,
-        onclick: () => go({ repo: state.repo.id, wt: name }),
-        onauxclick: (e) => { if (e.button === 1) act.closeTab(w); },
-      }, h('span', {}, name), badge(state.wtStatus.get(w.path)), taskMark(w),
-      w.main ? null : h('span', {
-        class: 'x', role: 'button', 'aria-label': t('tab.close'), title: t('tab.close'),
-        onclick: (e) => { e.stopPropagation(); act.closeTab(w); },
-      }, '×'));
-      onContext(tab, () => [
-        { label: t('git.fetch'), run: () => act.gitOp('fetch', {}, w) },
-        { label: t('git.pullFF'), run: () => act.gitOp('pull', {}, w) },
-        { label: t('git.push'), run: () => act.pushBranch(w) },
-        '-',
-        { label: t('path.copy'), run: () => copyText(w.path) },
-        w.main ? null : { label: t('tab.close'), danger: true, run: () => act.closeTab(w) },
-      ]);
-      return tab;
-    });
-    const add = h('button', { class: 'btn small', 'aria-haspopup': 'menu', onclick: (e) => menuAt(e.currentTarget, openMenu()) }, t('tab.open'));
-    mount(el, h('div', { role: 'tablist', style: { display: 'contents' } }, list), add);
-  };
-  on('repo worktrees wt status sessions', render);
-  render();
-}
 
-function openMenu() {
-  const opened = new Set(state.worktrees.map((w) => w.branch));
-  const local = state.branches.filter((b) => !b.remote && !opened.has(b.name));
-  const localNames = new Set(state.branches.filter((b) => !b.remote).map((b) => b.name));
-  const remote = state.branches.filter((b) => b.remote && !opened.has(b.name.slice(b.name.indexOf('/') + 1)) &&
-    !localNames.has(b.name.slice(b.name.indexOf('/') + 1)));
-  const items = [];
-  if (local.length) items.push({ section: t('branches.local') }, ...local.map((b) => ({ label: b.name, run: () => act.openBranchTab(b) })));
-  if (remote.length) items.push({ section: t('branches.remote') }, ...remote.map((b) => ({ label: b.name, run: () => act.openBranchTab(b) })));
-  if (!items.length) items.push({ label: t('tab.allOpen'), disabled: true, run() {} });
-  items.push('-', { label: t('branches.new'), run: () => run('branch.new') });
-  return items;
-}
 
 export async function newBranch() {
   const from = state.wt?.branch || '';

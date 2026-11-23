@@ -6,7 +6,7 @@ import { state, on, emit } from './store.js';
 import { register } from './commands.js';
 import * as act from './actions.js';
 import { loginView } from './views/login.js';
-import { topbar, tabs, newBranch } from './views/top.js';
+import { topbar, newBranch } from './views/top.js';
 import { left } from './views/left.js';
 import { center } from './views/center.js';
 import { dock } from './views/dock.js';
@@ -70,16 +70,14 @@ async function start(me) {
 
 function buildShell() {
   const top = h('header', { class: 'topbar' });
-  const tabBar = h('div', { class: 'tabs', 'aria-label': t('tab.list') });
   const leftEl = h('aside', { class: 'left', 'aria-label': t('pane.left') });
   const dockEl = h('section', { class: 'dock', 'aria-label': t('pane.out') });
   const centerEl = h('main', { class: 'center' }, dockEl);
   const rightEl = h('aside', { class: 'right', 'aria-label': t('fs.title') });
   const mnav = h('nav', { class: 'mnav', 'aria-label': t('pane.nav') });
-  mount(app, top, tabBar, h('div', { class: 'main' }, leftEl, centerEl, rightEl), mnav);
+  mount(app, top, h('div', { class: 'main' }, leftEl, centerEl, rightEl), mnav);
 
   topbar(top);
-  tabs(tabBar);
   left(leftEl);
   state.center = center(centerEl);
   const d = dock(dockEl);

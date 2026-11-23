@@ -1,4 +1,4 @@
-// Проход по интерфейсу: вход, вкладки, меню, изменения, копирование, телефон.
+// Проход по интерфейсу: вход, открытые ветки, меню, изменения, копирование, телефон.
 const { chromium, devices } = require('playwright');
 const OUT = process.env.OUT || __dirname + '/shots';
 const URL = 'http://127.0.0.1:8451/';
@@ -27,7 +27,7 @@ require('fs').mkdirSync(OUT, { recursive: true });
     await page.waitForSelector('.login .err:text("Неверный")');
     await page.fill('input[type=password]', 'secret');
     await page.click('button[type=submit]');
-    await page.waitForSelector('.tab.active');
+    await page.waitForSelector('.left .item.open.active');
   });
   await step('route has repo and wt', async () => {
     await page.waitForFunction(() => location.hash.includes('/repo/r1/wt/main'));
@@ -36,14 +36,14 @@ require('fs').mkdirSync(OUT, { recursive: true });
   await page.screenshot({ path: OUT + '/1-main.png' });
 
   await step('open feature tab and see badge', async () => {
-    await page.click('.tab:has-text("feature/login")');
+    await page.click('.left .item.open:has-text("feature/login")');
     await page.waitForFunction(() => location.hash.includes('feature%2Flogin'));
     await page.waitForSelector('.row:has-text("worktree.go") .st-new');
   });
   await page.waitForTimeout(400);
   await step('branch context menu', async () => {
     await page.click('.left .item:has-text("fix/api-timeout")', { button: 'right' });
-    await page.waitForSelector('.menu button:has-text("Открыть в отдельной вкладке")');
+    await page.waitForSelector('.menu button:has-text("Открыть ветку")');
   });
   await page.screenshot({ path: OUT + '/2-menu.png' });
   await page.keyboard.press('Escape');
@@ -199,7 +199,7 @@ require('fs').mkdirSync(OUT, { recursive: true });
     await page.click('.task-run');
     await page.waitForSelector('.term-tabs .t.on:has-text("▶ Сборка и бэкап")');
     await page.waitForSelector('.term-tabs .t.on .ok');
-    await page.waitForSelector('.tab.active .badge.ok');
+    await page.waitForSelector('.left .item.active .badge.ok');
     await page.waitForFunction(() => document.querySelector('.term-screen:not([hidden]) .xterm-rows').textContent.includes('готово'));
   });
   await page.screenshot({ path: OUT + '/14-task-run.png' });
@@ -311,7 +311,7 @@ require('fs').mkdirSync(OUT, { recursive: true });
     await page.waitForFunction(() => document.querySelectorAll('.commit-row').length === 4);
   });
   await step('auth: pull without login offers a deploy key', async () => {
-    await page.click('.tab:has-text("main")');
+    await page.click('.left .item.open:has-text("main")');
     await page.click('.topbar button:has-text("Pull")');
     await page.waitForSelector('.dialog:has-text("Нужен вход на сервер репозитория") pre:has-text("could not read Username")');
     await page.click('.dialog footer button:has-text("Подключить deploy-ключ")');
