@@ -2,7 +2,7 @@
 // задачи и проблемы заполнят сеансы задач в 0.2. Высота панели меняется перетаскиванием
 // верхней границы и запоминается.
 import { h, mount } from '../ui.js';
-import { t } from '../i18n.js';
+import { t, lang } from '../i18n.js';
 import { state, on, emit } from '../store.js';
 import { terminalPanel } from './terminal.js';
 import { tasksPane } from './tasks.js';
@@ -24,7 +24,7 @@ function save(v) {
   } catch { /* не запомнится */ }
 }
 
-const time = new Intl.DateTimeFormat('ru', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+const time = new Intl.DateTimeFormat(lang, { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
 
 export function dock(el) {
   const saved = load();

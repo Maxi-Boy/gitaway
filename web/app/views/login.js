@@ -1,10 +1,20 @@
 // Экран входа. В режиме token пароль это токен из вывода при запуске сервера;
 // в режиме PAM это обычный пароль учётной записи на сервере.
 import { h, mount } from '../ui.js';
-import { t } from '../i18n.js';
+import { t, lang, languages, setLang } from '../i18n.js';
 import { api } from '../api.js';
 
+// langSwitch: RU | EN, выбранный язык выделен; смена перезагружает страницу.
+export function langSwitch() {
+  return h('div', { class: 'seg', role: 'group', 'aria-label': t('lang.title') }, languages.map((l) => h('button', {
+    type: 'button', class: l === lang ? 'on' : null, 'aria-pressed': String(l === lang), title: t('lang.' + l),
+    onclick: () => setLang(l),
+  }, l.toUpperCase())));
+}
+
 export function loginView(el, onDone) {
+  const hint = h('p', { class: 'muted' }, t('auth.hintToken'));
+  api.get('/api/login').then((r) => { hint.textContent = r?.mode === 'pam' ? t('auth.hintPam') : t('auth.hintToken'); }, () => {});
   const user = h('input', { type: 'text', autocomplete: 'username', autocapitalize: 'off', spellcheck: false });
   const pass = h('input', { type: 'password', autocomplete: 'current-password' });
   const err = h('div', { class: 'err', role: 'alert' });
@@ -20,14 +30,14 @@ export function loginView(el, onDone) {
         pass.value = '';
         onDone(res);
       } catch (ex) {
-        err.textContent = ex.status === 401 ? t('auth.invalid') : ex.status === 429 ? t('auth.tooMany') : ex.message;
+        err.textContent = { 401: t('auth.invalid'), 429: t('auth.tooMany'), 503: t('auth.unavailable') }[ex.status] || ex.message;
         btn.disabled = false;
         pass.focus();
       }
     },
   },
-  h('h1', {}, 'gitaway'),
-  h('p', { class: 'muted' }, t('auth.hint')),
+  h('div', { class: 'field' }, h('h1', { class: 'grow' }, 'gitaway'), langSwitch()),
+  hint,
   h('label', {}, t('auth.user'), user),
   h('label', {}, t('auth.password'), pass),
   err, btn);

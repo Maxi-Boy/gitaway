@@ -106,6 +106,25 @@ type Vars struct {
 	Repo     string
 	Branch   string
 	Now      time.Time
+	Lang     string // язык сообщений сценария: "en" или русский по умолчанию
+}
+
+// messages это служебные строки сценария на языке интерфейса.
+type messages struct{ step, done string }
+
+func messagesFor(lang string) messages {
+	if lang == "en" {
+		return messages{step: "✗ step %d failed with code", done: "✓ done"}
+	}
+	return messages{step: "✗ шаг %d завершился с кодом", done: "✓ готово"}
+}
+
+// TimeoutNote это строка, которую терминал показывает при остановке по таймауту.
+func TimeoutNote(lang string, d time.Duration) string {
+	if lang == "en" {
+		return "[stopped: timeout " + d.String() + "]"
+	}
+	return "[остановлено по таймауту " + d.String() + "]"
 }
 
 // Quote заключает строку в одинарные кавычки оболочки: внутри ничего не раскрывается.
@@ -142,6 +161,7 @@ func Expand(step string, v Vars) string {
 // (или продолжение с итоговым кодом первой ошибки при ContinueOnError).
 func Script(t Task, v Vars) string {
 	var b strings.Builder
+	msg := messagesFor(v.Lang)
 	b.WriteString("__gitaway_fail=0\n")
 	n := len(t.Steps)
 	for i, raw := range t.Steps {
@@ -150,14 +170,14 @@ func Script(t Task, v Vars) string {
 		b.WriteString(step)
 		b.WriteString("\n__gitaway_c=$?\n")
 		fmt.Fprintf(&b, "if [ \"$__gitaway_c\" -ne 0 ]; then printf '\\033[31m%%s %%s\\033[0m\\n' %s \"$__gitaway_c\"; ",
-			Quote(fmt.Sprintf("✗ шаг %d завершился с кодом", i+1)))
+			Quote(fmt.Sprintf(msg.step, i+1)))
 		if t.ContinueOnError {
 			b.WriteString("[ \"$__gitaway_fail\" -eq 0 ] && __gitaway_fail=$__gitaway_c; fi\n")
 		} else {
 			b.WriteString("exit \"$__gitaway_c\"; fi\n")
 		}
 	}
-	b.WriteString("if [ \"$__gitaway_fail\" -eq 0 ]; then printf '\\033[32m%s\\033[0m\\n' '✓ готово'; fi\n")
+	fmt.Fprintf(&b, "if [ \"$__gitaway_fail\" -eq 0 ]; then printf '\\033[32m%%s\\033[0m\\n' %s; fi\n", Quote(msg.done))
 	b.WriteString("exit \"$__gitaway_fail\"\n")
 	return b.String()
 }

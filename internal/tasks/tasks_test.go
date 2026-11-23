@@ -170,3 +170,18 @@ func TestDetect(t *testing.T) {
 		t.Errorf("empty dir: %v", got)
 	}
 }
+
+func TestScriptEnglish(t *testing.T) {
+	task := Task{Name: "t", Steps: []string{"true", "false"}}
+	out, code := runScript(t, t.TempDir(), Script(task, Vars{Lang: "en"}))
+	if code != 1 || !strings.Contains(out, "✗ step 2 failed with code 1") {
+		t.Errorf("english failure line: %d %q", code, out)
+	}
+	task.Steps = []string{"true"}
+	if out, _ := runScript(t, t.TempDir(), Script(task, Vars{Lang: "en"})); !strings.Contains(out, "✓ done") {
+		t.Errorf("english done line: %q", out)
+	}
+	if TimeoutNote("en", time.Minute) != "[stopped: timeout 1m0s]" || !strings.Contains(TimeoutNote("", time.Minute), "таймауту") {
+		t.Error("timeout notes")
+	}
+}

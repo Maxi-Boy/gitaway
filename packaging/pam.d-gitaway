@@ -1,0 +1,6 @@
+#%PAM-1.0
+# Сервис PAM для gitaway (auth_mode "pam"): sudo cp packaging/pam.d-gitaway /etc/pam.d/gitaway
+# Проверка пароля и учётной записи как при обычном входе (RED OS, RHEL, Fedora: system-auth).
+# На Debian и Ubuntu вместо system-auth: @include common-auth и @include common-account.
+auth       include      system-auth
+account    include      system-auth

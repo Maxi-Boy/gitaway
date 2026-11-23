@@ -1,5 +1,5 @@
 // Общие элементы интерфейса: создание DOM, меню, диалоги, уведомления.
-import { t } from './i18n.js';
+import { t, lang } from './i18n.js';
 
 // h создаёт элемент: h('button', {class: 'btn', onclick}, 'текст', child, [дети]).
 // Текст всегда вставляется как текст, не как HTML.
@@ -199,7 +199,7 @@ export function toast(text, { bad = false, ms = 4000 } = {}) {
 
 // --- форматирование ---
 
-const rtf = new Intl.RelativeTimeFormat('ru', { numeric: 'auto' });
+const rtf = new Intl.RelativeTimeFormat(lang, { numeric: 'auto' });
 
 // ago: "2 ч назад", "вчера"; unix в секундах.
 export function ago(unix) {
@@ -214,8 +214,8 @@ export function ago(unix) {
   return rtf.format(Math.round(s / 86400 / 365), 'year');
 }
 
-const dtf = new Intl.DateTimeFormat('ru', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-const dtfYear = new Intl.DateTimeFormat('ru', { day: '2-digit', month: '2-digit', year: 'numeric' });
+const dtf = new Intl.DateTimeFormat(lang, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+const dtfYear = new Intl.DateTimeFormat(lang, { day: '2-digit', month: '2-digit', year: 'numeric' });
 
 // stamp: "20.11, 08:41" в этом году, иначе "20.11.2025".
 export function stamp(unix) {
@@ -233,7 +233,7 @@ export function stampYY(unix) {
 }
 
 export function fullStamp(unix) {
-  return unix ? new Date(unix * 1000).toLocaleString('ru') : '—';
+  return unix ? new Date(unix * 1000).toLocaleString(lang) : '—';
 }
 
 export function size(n) {

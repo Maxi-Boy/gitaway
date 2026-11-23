@@ -1,6 +1,6 @@
 // Точка входа: вход, каркас экрана, команды, маршрут.
 import { h, mount, toast } from './ui.js';
-import { t } from './i18n.js';
+import { t, lang, setLang } from './i18n.js';
 import { api, setCSRF, events } from './api.js';
 import { state, on, emit } from './store.js';
 import { register } from './commands.js';
@@ -143,6 +143,8 @@ function registerCommands() {
       location.reload();
     }
   } });
+  register({ id: 'lang.ru', title: t('cmd.langRu'), when: () => lang !== 'ru', run: () => setLang('ru') });
+  register({ id: 'lang.en', title: t('cmd.langEn'), when: () => lang !== 'en', run: () => setLang('en') });
   registerTreeCommands(register);
 }
 

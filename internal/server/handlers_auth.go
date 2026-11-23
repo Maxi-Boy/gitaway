@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"net/http"
 	"os"
 
@@ -14,6 +15,15 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		// экран входа показывает подсказку: токен из вывода или пароль учётной записи
+		mode := s.cfg.AuthMode
+		if mode == "" {
+			mode = "token"
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"mode": mode})
+		return
+	}
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
 		return
@@ -37,8 +47,14 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	user, err := s.auth.Authenticate(req.Username, req.Password)
 	if err != nil {
+		if !errors.Is(err, auth.ErrInvalidCredentials) {
+			// неверно настроен сервис PAM и т.п.: это не ошибка пользователя
+			s.log.Error("login unavailable", "err", err)
+			writeError(w, http.StatusServiceUnavailable, "auth_unavailable", "login is unavailable, see the server log")
+			return
+		}
 		s.limiter.Fail(ip)
-		s.log.Warn("login failed", "ip", ip) // пароль и токен в лог не пишем
+		s.log.Warn("login failed", "ip", ip, "reason", err.Error()) // пароль и токен в лог не пишем
 		writeError(w, http.StatusUnauthorized, "invalid_credentials", "invalid credentials")
 		return
 	}

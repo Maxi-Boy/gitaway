@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"os/user"
 	"path/filepath"
 	"syscall"
 	"time"
@@ -85,6 +86,16 @@ func run() error {
 		authn, err = auth.NewPAM(cfg.PAMService)
 		if err != nil {
 			return err
+		}
+		if os.Geteuid() == 0 {
+			return errors.New("в режиме pam gitaway запускается от обычного пользователя, не от root")
+		}
+		if _, err := os.Stat(filepath.Join("/etc/pam.d", cfg.PAMService)); err != nil {
+			log.Warn("нет файла сервиса PAM: вход работать не будет, см. packaging/pam.d-gitaway",
+				"file", filepath.Join("/etc/pam.d", cfg.PAMService))
+		}
+		if u, err := user.Current(); err == nil {
+			log.Info("вход: пароль учётной записи (PAM)", "user", u.Username, "service", cfg.PAMService)
 		}
 	default:
 		ta, err := auth.NewTokenAuth()

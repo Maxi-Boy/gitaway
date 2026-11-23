@@ -15,7 +15,8 @@ require('fs').mkdirSync(OUT, { recursive: true });
     try { await fn(); console.log('ok  ', name); } catch (e) { console.log('FAIL', name, '-', e.message.split('\n')[0]); }
   };
 
-  const ctx = await browser.newContext({ viewport: { width: 1440, height: 860 } });
+  // язык интерфейса выбирается по языку браузера: основной сценарий на русском
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 860 }, locale: 'ru-RU' });
   const page = await ctx.newPage();
   watch(page);
   await page.goto(URL);
@@ -249,7 +250,7 @@ require('fs').mkdirSync(OUT, { recursive: true });
   await page.screenshot({ path: OUT + '/17-cloned.png' });
 
   // телефон
-  const m = await browser.newContext({ ...devices['iPhone 13'] });
+  const m = await browser.newContext({ ...devices['iPhone 13'], locale: 'ru-RU' });
   const mp = await m.newPage();
   watch(mp);
   await mp.goto(URL + '#/repo/r1/wt/feature%2Flogin');
@@ -275,6 +276,34 @@ require('fs').mkdirSync(OUT, { recursive: true });
     await mp.waitForSelector('.term-keys button:has-text("Esc")');
   });
   await mp.screenshot({ path: OUT + '/11-mobile-out.png' });
+
+  // английский интерфейс: переключатель на экране входа, выбор запоминается
+  const en = await browser.newContext({ viewport: { width: 1440, height: 860 }, locale: 'ru-RU' });
+  const ep = await en.newPage();
+  watch(ep);
+  await ep.request.post(URL + 'api/logout', { headers: { 'X-CSRF-Token': 'tok' } }); // заглушка: вход общий
+  await ep.goto(URL);
+  await step('english: switch on the login screen', async () => {
+    await ep.click('.login .seg button:has-text("EN")');
+    await ep.waitForSelector('.login button[type=submit]:has-text("Sign in")');
+    await ep.waitForSelector('.login p:has-text("server account")'); // подсказка режима PAM
+  });
+  await step('english: main screen after reload', async () => {
+    await ep.fill('input[autocomplete=username]', 'sysadmin');
+    await ep.fill('input[type=password]', 'secret');
+    await ep.click('button[type=submit]');
+    await ep.goto(URL + '#/repo/r1/wt/feature%2Flogin');
+    await ep.waitForSelector('.topbar button:has-text("Open server folders")');
+    await ep.waitForSelector('.task-edit:has-text("Scripts")');
+    await ep.waitForSelector('.row.head:has-text("Last commit")');
+    if ((await ep.getAttribute('html', 'lang')) !== 'en') throw new Error('html lang');
+  });
+  await ep.screenshot({ path: OUT + '/18-english.png' });
+  await step('english: back to Russian from the user menu', async () => {
+    await ep.click('.topbar button:has-text("sysadmin@nvme-lab")');
+    await ep.click('.menu button:has-text("Русский")');
+    await ep.waitForSelector('.topbar button:has-text("Открыть локальную ФС")');
+  });
 
   console.log('errors:', errors.length ? errors : 'none');
   await browser.close();

@@ -142,6 +142,7 @@ http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': type, 'Content-Security-Policy': "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'" });
     return res.end(fs.readFileSync(f));
   }
+  if (p === '/api/login' && req.method === 'GET') return json(res, 200, { mode: 'pam' });
   if (p === '/api/login') {
     const b = await body(req);
     if (b.password !== 'secret') return err(res, 401, 'invalid_credentials', 'invalid credentials');

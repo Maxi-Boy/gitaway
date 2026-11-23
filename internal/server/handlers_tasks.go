@@ -189,6 +189,7 @@ func (s *Server) handleRunTask(w http.ResponseWriter, r *http.Request, _ auth.Se
 		ID   string `json:"id"`
 		Cols uint16 `json:"cols"`
 		Rows uint16 `json:"rows"`
+		Lang string `json:"lang"`
 	}
 	if err := decodeJSON(w, r, &req); err != nil {
 		return err
@@ -224,10 +225,11 @@ func (s *Server) handleRunTask(w http.ResponseWriter, r *http.Request, _ auth.Se
 	if wtDir != "" {
 		branch = s.currentBranch(r.Context(), wtDir)
 	}
-	script := tasks.Script(task, tasks.Vars{Worktree: wtDir, Repo: repoName, Branch: branch, Now: time.Now()})
+	script := tasks.Script(task, tasks.Vars{Worktree: wtDir, Repo: repoName, Branch: branch, Now: time.Now(), Lang: req.Lang})
 	sess, err := s.terms.Start(session.Options{
 		Kind: "task", Title: task.Name, Dir: dir, Repo: repoID, WT: req.WT,
 		Args: append(session.Shell(), "-c", script), Cols: req.Cols, Rows: req.Rows, Timeout: task.Duration(),
+		TimeoutNote: tasks.TimeoutNote(req.Lang, task.Duration()),
 	})
 	if err != nil {
 		return err

@@ -59,6 +59,8 @@ type Options struct {
 	Kind    string        // shell (по умолчанию), task или clone
 	Timeout time.Duration // 0: без ограничения; по истечении процесс останавливается
 	Env     []string      // дополнительные переменные окружения процесса
+	// TimeoutNote показывается в выводе при остановке по таймауту (пусто: по-русски)
+	TimeoutNote string
 }
 
 // Manager хранит сеансы этого процесса gitaway.
@@ -162,7 +164,11 @@ func (m *Manager) Start(o Options) (*Session, error) {
 			s.mu.Lock()
 			s.info.TimedOut = true
 			s.mu.Unlock()
-			s.publish([]byte("\r\n\x1b[31m[остановлено по таймауту " + o.Timeout.String() + "]\x1b[0m\r\n"))
+			note := o.TimeoutNote
+			if note == "" {
+				note = "[остановлено по таймауту " + o.Timeout.String() + "]"
+			}
+			s.publish([]byte("\r\n\x1b[31m" + note + "\x1b[0m\r\n"))
 			s.stop(5 * time.Second)
 		})
 		s.mu.Unlock()

@@ -1,7 +1,7 @@
 // Задачи: мои скрипты, задачи из .gitaway.json (после одобрения) и автоопределённые.
 // Запуск идёт сеансом на сервере: вывод открывается в терминале и переживает закрытие браузера.
 import { h, mount, dialog, confirm, toast, stamp } from '../ui.js';
-import { t } from '../i18n.js';
+import { t, lang } from '../i18n.js';
 import { api } from '../api.js';
 import { state, emit, on, wtParam } from '../store.js';
 
@@ -55,7 +55,7 @@ export async function runTask(task) {
   if (task.confirm && !await confirm(t('tasks.confirmTitle', { name: task.name }), stepsList(task), t('tasks.run'))) return;
   askNotify();
   try {
-    const info = await api.post('/api/tasks/run', { repo: state.repo?.id || '', wt: wtParam(), id: task.id, cols: 120, rows: 30 });
+    const info = await api.post('/api/tasks/run', { repo: state.repo?.id || '', wt: wtParam(), id: task.id, cols: 120, rows: 30, lang });
     state.lastTask = task;
     if (innerWidth < 900) { state.pane = 'out'; emit('pane'); }
     await state.dock?.openSession(info);

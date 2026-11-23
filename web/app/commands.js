@@ -1,7 +1,7 @@
 // Реестр команд. Кнопки, меню, горячие клавиши и палитра (Ctrl+K) вызывают
 // действия только через него, поэтому новая возможность это одна регистрация.
 import { h, dialog, toast } from './ui.js';
-import { t } from './i18n.js';
+import { t, lang } from './i18n.js';
 
 const registry = new Map();
 const recent = [];
@@ -80,7 +80,7 @@ export function openPalette() {
     };
     items = all
       .filter((c) => !q || q.split(/\s+/).every((w) => c.title.toLowerCase().includes(w)))
-      .sort((a, b) => score(a) - score(b) || a.title.localeCompare(b.title, 'ru'));
+      .sort((a, b) => score(a) - score(b) || a.title.localeCompare(b.title, lang));
     sel = Math.min(sel, Math.max(0, items.length - 1));
     results.replaceChildren(...items.map((c, i) => h('button', {
       class: i === sel ? 'on' : null, role: 'option',
