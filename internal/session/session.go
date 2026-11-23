@@ -35,6 +35,7 @@ var ErrNotFound = errors.New("session not found")
 // Info это описание сеанса для списка в интерфейсе.
 type Info struct {
 	ID       string    `json:"id"`
+	Kind     string    `json:"kind"` // shell или task
 	Title    string    `json:"title"`
 	Dir      string    `json:"dir"`
 	Repo     string    `json:"repo,omitempty"`
@@ -42,6 +43,7 @@ type Info struct {
 	Started  time.Time `json:"started"`
 	Running  bool      `json:"running"`
 	ExitCode int       `json:"exit_code"`
+	TimedOut bool      `json:"timed_out,omitempty"`
 }
 
 // Options описывает новый сеанс.
@@ -53,6 +55,9 @@ type Options struct {
 	Args  []string // команда; пусто: оболочка входа пользователя
 	Cols  uint16
 	Rows  uint16
+
+	Kind    string        // shell (по умолчанию) или task
+	Timeout time.Duration // 0: без ограничения; по истечении процесс останавливается
 }
 
 // Manager хранит сеансы этого процесса gitaway.
@@ -77,6 +82,7 @@ type Session struct {
 	pty  *os.File
 
 	mu     sync.Mutex
+	timer  *time.Timer
 	buf    []byte
 	limit  int
 	subs   map[chan []byte]struct{}
@@ -130,8 +136,12 @@ func (m *Manager) Start(o Options) (*Session, error) {
 	if err != nil {
 		return nil, err
 	}
+	kind := o.Kind
+	if kind == "" {
+		kind = "shell"
+	}
 	s := &Session{
-		info:  Info{ID: newID(), Title: o.Title, Dir: o.Dir, Repo: o.Repo, WT: o.WT, Started: time.Now(), Running: true},
+		info:  Info{ID: newID(), Kind: kind, Title: o.Title, Dir: o.Dir, Repo: o.Repo, WT: o.WT, Started: time.Now(), Running: true},
 		cmd:   cmd,
 		pty:   f,
 		limit: m.Buffer,
@@ -144,6 +154,17 @@ func (m *Manager) Start(o Options) (*Session, error) {
 	m.mu.Lock()
 	m.sessions[s.info.ID] = s
 	m.mu.Unlock()
+	if o.Timeout > 0 {
+		s.mu.Lock()
+		s.timer = time.AfterFunc(o.Timeout, func() {
+			s.mu.Lock()
+			s.info.TimedOut = true
+			s.mu.Unlock()
+			s.publish([]byte("\r\n\x1b[31m[остановлено по таймауту " + o.Timeout.String() + "]\x1b[0m\r\n"))
+			s.stop(5 * time.Second)
+		})
+		s.mu.Unlock()
+	}
 	go s.readLoop()
 	return s, nil
 }
@@ -169,6 +190,9 @@ func (s *Session) readLoop() {
 	}
 	_ = s.pty.Close()
 	s.mu.Lock()
+	if s.timer != nil {
+		s.timer.Stop()
+	}
 	s.info.Running = false
 	s.info.ExitCode = code
 	s.ended = time.Now()

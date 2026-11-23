@@ -20,6 +20,7 @@ import (
 	"github.com/Maxi-Boy/gitaway/internal/jobs"
 	"github.com/Maxi-Boy/gitaway/internal/session"
 	"github.com/Maxi-Boy/gitaway/internal/store"
+	"github.com/Maxi-Boy/gitaway/internal/tasks"
 )
 
 // Deps это зависимости сервера.
@@ -33,6 +34,8 @@ type Deps struct {
 	Log      *slog.Logger
 	Web      fs.FS            // статический интерфейс для "/" (может быть nil)
 	Terms    *session.Manager // терминалы и другие процессы в pty (nil: новый менеджер)
+	Tasks    *TasksDoc        // мои скрипты (nil: только в памяти)
+	Trust    *TrustDoc        // доверие к .gitaway.json (nil: только в памяти)
 }
 
 // Server обслуживает API и статические файлы.
@@ -52,6 +55,8 @@ type Server struct {
 	allow    []netip.Prefix
 	allowAll bool
 	terms    *session.Manager
+	tasks    *TasksDoc
+	trust    *TrustDoc
 }
 
 func New(d Deps) *Server {
@@ -69,6 +74,13 @@ func New(d Deps) *Server {
 	if terms == nil {
 		terms = session.NewManager()
 	}
+	tasksDoc, trustDoc := d.Tasks, d.Trust
+	if tasksDoc == nil {
+		tasksDoc, _ = store.OpenDoc("", []tasks.Task{})
+	}
+	if trustDoc == nil {
+		trustDoc, _ = store.OpenDoc("", map[string][]string{})
+	}
 	return &Server{
 		cfg:      d.Cfg,
 		auth:     d.Auth,
@@ -85,6 +97,8 @@ func New(d Deps) *Server {
 		allow:    allow,
 		allowAll: len(d.Cfg.AllowCIDRs) == 0,
 		terms:    terms,
+		tasks:    tasksDoc,
+		trust:    trustDoc,
 	}
 }
 
@@ -110,6 +124,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/diff", s.api(s.handleDiff))
 	mux.HandleFunc("/api/sessions", s.api(s.handleSessions))
 	mux.HandleFunc("/api/sessions/ws", s.api(s.handleSessionWS))
+	mux.HandleFunc("/api/tasks", s.api(s.handleTasks))
+	mux.HandleFunc("/api/tasks/mine", s.api(s.handleMyTasks))
+	mux.HandleFunc("/api/tasks/trust", s.api(s.handleTrust))
+	mux.HandleFunc("/api/tasks/run", s.api(s.handleRunTask))
 	s.registerGit(mux)
 	s.registerChanges(mux)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {

@@ -20,6 +20,7 @@ import (
 	"github.com/Maxi-Boy/gitaway/internal/gitx"
 	"github.com/Maxi-Boy/gitaway/internal/server"
 	"github.com/Maxi-Boy/gitaway/internal/store"
+	"github.com/Maxi-Boy/gitaway/internal/tasks"
 	"github.com/Maxi-Boy/gitaway/web"
 )
 
@@ -64,6 +65,14 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	myTasks, err := store.OpenDoc(filepath.Join(cfg.DataDir, "tasks.json"), []tasks.Task{})
+	if err != nil {
+		return err
+	}
+	trust, err := store.OpenDoc(filepath.Join(cfg.DataDir, "trust.json"), map[string][]string{})
+	if err != nil {
+		return err
+	}
 
 	var authn auth.Authenticator
 	switch cfg.AuthMode {
@@ -103,6 +112,8 @@ func run() error {
 		Git:      gitx.NewRunner(),
 		Log:      log,
 		Web:      web.FS,
+		Tasks:    myTasks,
+		Trust:    trust,
 	})
 	httpSrv := &http.Server{
 		Addr:              cfg.Listen,

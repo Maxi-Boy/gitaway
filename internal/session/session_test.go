@@ -100,3 +100,24 @@ func TestCloseAndLimit(t *testing.T) {
 		t.Errorf("resize after exit must be a no-op: %v", err)
 	}
 }
+
+func TestTimeout(t *testing.T) {
+	m := NewManager()
+	s, err := m.Start(Options{Kind: "task", Dir: t.TempDir(), Args: []string{"/bin/sh", "-c", "sleep 30"}, Timeout: 300 * time.Millisecond})
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-s.Done():
+	case <-time.After(8 * time.Second):
+		t.Fatal("timeout did not stop the process")
+	}
+	info := s.Info()
+	if !info.TimedOut || info.Running || info.Kind != "task" {
+		t.Errorf("info: %+v", info)
+	}
+	snap, _, _ := s.Attach()
+	if !strings.Contains(string(snap), "таймауту") {
+		t.Errorf("timeout message missing: %q", snap)
+	}
+}
