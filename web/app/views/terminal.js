@@ -34,8 +34,8 @@ const THEMES = {
     brightYellow: '#e3b341', brightBlue: '#79c0ff', brightMagenta: '#d2a8ff', brightCyan: '#56d4dd', brightWhite: '#f0f6fc',
   },
   light: {
-    background: '#f8f6f2', foreground: '#2b2e33', cursor: '#2b2e33', cursorAccent: '#f8f6f2', selectionBackground: '#c8d8ee',
-    black: '#2b2e33', red: '#be3a2c', green: '#2a7a39', yellow: '#8a5f00', blue: '#1d5fb8', magenta: '#7444c8',
+    background: '#fafbfc', foreground: '#1f2328', cursor: '#1f2328', cursorAccent: '#fafbfc', selectionBackground: '#cddcf1',
+    black: '#1f2328', red: '#c0362c', green: '#1f7a34', yellow: '#8a5a00', blue: '#1d5fb8', magenta: '#7444c8',
     cyan: '#16707c', white: '#6e7681', brightBlack: '#5f6670', brightRed: '#a8291d', brightGreen: '#1f6a2c',
     brightYellow: '#6f4c00', brightBlue: '#134a92', brightMagenta: '#5d34a8', brightCyan: '#0f5b65', brightWhite: '#8a9099',
   },

@@ -42,35 +42,35 @@
   color-scheme: dark;
 }
 
-/* светлая тема: тёплый серый вместо белого, мягкий контраст для долгой работы */
+/* светлая тема: нейтральный светло-серый вместо белого, тёмно-графитовый текст */
 :root[data-theme="light"] {
-  --bg: #f3f1ec;
-  --bg-deep: #f8f6f2;
-  --panel: #ebe8e1;
-  --raised: #faf8f5;
-  --hover: #e2ded5;
-  --line: #d5d0c6;
-  --line-soft: #e3dfd7;
-  --ctl: #eeebe4;
-  --ctl-line: #c8c2b6;
-  --text: #2b2e33;
-  --muted: #5f6670;
+  --bg: #f5f6f8;
+  --bg-deep: #fafbfc;
+  --panel: #eceef1;
+  --raised: #fcfcfd;
+  --hover: #e3e6ea;
+  --line: #d6dae0;
+  --line-soft: #e5e8ec;
+  --ctl: #f1f3f5;
+  --ctl-line: #c7cdd4;
+  --text: #1f2328;
+  --muted: #57606a;
   --accent: #2f6fd0;
-  --link: #1d5fb8;
-  --warn: #8a5f00;
-  --bad: #be3a2c;
-  --good: #2a7a39;
-  --add-bg: rgba(42, 122, 57, .13);
-  --del-bg: rgba(190, 58, 44, .11);
-  --sel-bg: rgba(47, 111, 208, .14);
-  --mark-bg: rgba(214, 160, 30, .32);
-  --shadow: rgba(60, 50, 30, .16);
-  --overlay: rgba(40, 35, 25, .32);
-  --cm-sel: rgba(47, 111, 208, .22);
-  --cm-line: rgba(120, 110, 90, .08);
+  --link: #1a5fb4;
+  --warn: #8a5a00;
+  --bad: #c0362c;
+  --good: #1f7a34;
+  --add-bg: rgba(31, 122, 52, .12);
+  --del-bg: rgba(192, 54, 44, .10);
+  --sel-bg: rgba(47, 111, 208, .13);
+  --mark-bg: rgba(212, 167, 44, .30);
+  --shadow: rgba(31, 35, 40, .14);
+  --overlay: rgba(31, 35, 40, .30);
+  --cm-sel: rgba(47, 111, 208, .20);
+  --cm-line: rgba(31, 35, 40, .045);
   --syn-kw: #c2352a;
   --syn-str: #0d3e78;
-  --syn-com: #6e7681;
+  --syn-com: #6e7781;
   --syn-num: #0b57a8;
   --syn-type: #924000;
   --syn-fn: #7444c8;
