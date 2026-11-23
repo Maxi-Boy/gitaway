@@ -6,6 +6,7 @@
 package gitx
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -52,6 +53,23 @@ func redactAll(args []string) []string {
 		out[i] = redact(a)
 	}
 	return out
+}
+
+// NeedsLogin сообщает, что git не смог войти на сервер репозитория: по HTTPS нужен логин
+// (спросить его некому, диалоги выключены) или ключ SSH не подошёл.
+func NeedsLogin(err error) bool {
+	var ge *Error
+	if !errors.As(err, &ge) {
+		return false
+	}
+	o := strings.ToLower(ge.Output)
+	for _, s := range []string{"could not read username", "could not read password", "authentication failed",
+		"terminal prompts disabled", "permission denied (publickey)", "invalid username or password"} {
+		if strings.Contains(o, s) {
+			return true
+		}
+	}
+	return false
 }
 
 // Runner запускает git. Нулевое значение пригодно к использованию.
@@ -126,4 +144,80 @@ func (r *Runner) RunCombined(ctx context.Context, dir string, args ...string) (s
 		ge.Output = out
 	}
 	return out, err
+}
+
+// Stream запускает git и передаёт fn вывод по записям, разделённым sep. Если fn вернула
+// false, git останавливается (так поиск и история не читают лишнего). Ошибкой считается
+// только сбой запуска или код выхода, отличный от allow, когда вывод дочитан до конца.
+func (r *Runner) Stream(ctx context.Context, dir string, env []string, sep byte, allow []int, fn func(rec []byte) bool, args ...string) error {
+	if _, ok := ctx.Deadline(); !ok && r.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, r.Timeout)
+		defer cancel()
+	}
+	ctx, stop := context.WithCancel(ctx)
+	defer stop()
+	bin := r.GitBin
+	if bin == "" {
+		bin = "git"
+	}
+	cmd := exec.CommandContext(ctx, bin, args...)
+	cmd.Dir = dir
+	cmd.WaitDelay = 5 * time.Second
+	cmd.Env = append(append(append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "LC_ALL=C"), r.Env...), env...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	if err := cmd.Start(); err != nil {
+		return &Error{Args: redactAll(args), Code: -1, Output: err.Error()}
+	}
+	sc := bufio.NewScanner(out)
+	sc.Buffer(make([]byte, 64<<10), 4<<20)
+	sc.Split(func(data []byte, atEOF bool) (int, []byte, error) {
+		if i := bytes.IndexByte(data, sep); i >= 0 {
+			return i + 1, data[:i], nil
+		}
+		if atEOF && len(data) > 0 {
+			return len(data), data, nil
+		}
+		return 0, nil, nil
+	})
+	stopped := false
+	for sc.Scan() {
+		if !fn(sc.Bytes()) {
+			stopped = true
+			break
+		}
+	}
+	scanErr := sc.Err()
+	if stopped || scanErr != nil {
+		stop() // остальное не нужно: git получает сигнал и выходит
+	}
+	err = cmd.Wait()
+	if stopped {
+		return nil
+	}
+	if scanErr != nil {
+		return &Error{Args: redactAll(args), Code: -1, Output: scanErr.Error()}
+	}
+	if err != nil {
+		e := &Error{Args: redactAll(args), Code: -1, Output: redact(strings.TrimSpace(stderr.String()))}
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
+			e.Code = ee.ExitCode()
+			for _, c := range allow {
+				if c == e.Code {
+					return nil
+				}
+			}
+		}
+		if ctx.Err() != nil {
+			e.Output = ctx.Err().Error()
+		}
+		return e
+	}
+	return nil
 }

@@ -127,6 +127,7 @@ export function treeView(route) {
     return [
       { label: e.is_dir ? t('files.openFolder') : t('files.open'), run: () => open(e) },
       !e.is_dir && changed ? { label: t('files.showDiff'), run: () => act.nav({ view: 'changes', path: join(dir, e.name) }) } : null,
+      e.status !== '??' ? { label: e.is_dir ? t('history.folderHistory') : t('history.fileHistory'), run: () => act.nav({ view: 'history', path: join(dir, e.name), commit: '' }) } : null,
       '-',
       { label: t('files.toServer'), run: () => copyToServer({ path: dir, items: names }) },
       { label: t('term.inTab'), run: () => state.dock?.newTerminal() },

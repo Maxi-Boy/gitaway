@@ -65,7 +65,7 @@ export async function applyRoute() {
 
 // nav меняет часть адреса, сохраняя остальное (строка сбрасывается).
 export function nav(patch, replace = false) {
-  go({ ...state.route, line: 0, ...patch }, replace);
+  go({ ...state.route, line: 0, commit: '', ...patch }, replace);
 }
 
 // --- данные репозитория ---
@@ -134,8 +134,12 @@ export async function gitOp(op, body = {}, wt = state.wt) {
     return res;
   } catch (err) {
     logResult(cmd, false, err.message);
-    toast(t('git.failed', { op }) + ': ' + err.message, { bad: true });
     err.shown = true;
+    if (err.code === 'auth_required') {
+      import('./views/addrepo.js').then((m) => m.loginNeeded(op, err.message));
+      throw err;
+    }
+    toast(t('git.failed', { op }) + ': ' + err.message, { bad: true });
     throw err;
   } finally {
     refreshAll();

@@ -5,6 +5,7 @@ import { h, mount, dialog, toast, fullStamp } from '../ui.js';
 import { t, phrases } from '../i18n.js';
 import { api } from '../api.js';
 import { state, wtParam } from '../store.js';
+import * as act from '../actions.js';
 
 let cmPromise = null;
 
@@ -110,6 +111,10 @@ function cmAdapter(cm, parent, content, path, onChange) {
     markClean: () => { clean = view.state.doc; },
     setText: (text) => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } }),
     focus: () => view.focus(),
+    selection: () => {
+      const r = view.state.selection.main;
+      return view.state.sliceDoc(r.from, r.to);
+    },
     goLine: (line) => {
       const n = Math.max(1, Math.min(line, view.state.doc.lines));
       const l = view.state.doc.line(n);
@@ -139,6 +144,7 @@ function textAdapter(parent, content, path, onChange) {
     markClean: () => { clean = area.value; },
     setText: (text) => { area.value = text; onChange(); },
     focus: () => area.focus(),
+    selection: () => area.value.slice(area.selectionStart, area.selectionEnd),
     goLine: (line) => {
       const lines = area.value.split('\n');
       let pos = 0;
@@ -264,8 +270,10 @@ export function editorView(route) {
 
   const view = {
     el,
-    actions: [info, saveBtn],
+    actions: [info, saveBtn,
+      h('button', { class: 'btn small', title: t('history.fileHistory'), onclick: () => act.nav({ view: 'history', path, commit: '' }) }, t('history.short'))],
     save: () => save(),
+    selectedText: () => ed?.selection?.() || '',
     dirty,
     goLine: (n) => ed?.goLine(n),
     destroy: () => {

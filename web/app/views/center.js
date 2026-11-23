@@ -1,4 +1,4 @@
-// Центральная колонка: переключатель «Файлы / Изменения», хлебные крошки и текущий экран.
+// Центральная колонка: переключатель «Файлы / Изменения / История», поиск, хлебные крошки и текущий экран.
 import { h, mount, icon } from '../ui.js';
 import { t } from '../i18n.js';
 import { state, on } from '../store.js';
@@ -8,6 +8,8 @@ import { repoName } from './top.js';
 import { treeView } from './tree.js';
 import { editorView } from './editor.js';
 import { changesView } from './changes.js';
+import { searchView } from './search.js';
+import { historyView } from './history.js';
 
 export function center(el) {
   const bar = h('div', { class: 'bar' });
@@ -31,13 +33,20 @@ export function center(el) {
   const renderBar = () => {
     const r = state.route;
     const n = state.status?.changes?.length || 0;
+    const files = r.view === 'tree' || r.view === 'file';
     const seg = h('div', { class: 'seg', role: 'tablist' },
-      h('button', { class: r.view !== 'changes' ? 'on' : null, role: 'tab', onclick: () => act.nav({ view: 'tree', path: r.view === 'tree' ? r.path : '' }) }, t('files.title')),
+      h('button', { class: files ? 'on' : null, role: 'tab', onclick: () => act.nav({ view: 'tree', path: r.view === 'tree' ? r.path : '' }) }, t('files.title')),
       h('button', { class: r.view === 'changes' ? 'on' : null, role: 'tab', onclick: () => act.nav({ view: 'changes', path: '' }) },
-        t('changes.title'), n ? ' ' + n : ''));
+        t('changes.title'), n ? ' ' + n : ''),
+      h('button', { class: r.view === 'history' ? 'on' : null, role: 'tab', onclick: () => run('view.history') }, t('history.title')));
     mount(bar, seg,
-      r.view === 'changes' ? h('span', { class: 'grow' }) : h('div', { class: 'grow', style: { display: 'flex', minWidth: '0' } }, crumbs(r.path, r.view === 'file')),
+      files ? h('div', { class: 'grow', style: { display: 'flex', minWidth: '0' } }, crumbs(r.path, r.view === 'file')) : h('span', { class: 'grow' }),
       view?.actions || null,
+      h('button', {
+        class: 'btn icon' + (r.view === 'search' ? ' on' : ''), title: t('search.title') + ' (Ctrl+Shift+F)', 'aria-label': t('search.title'),
+        'aria-pressed': String(r.view === 'search'), onclick: () => run('search.show'),
+      }, icon('search')),
+      h('button', { class: 'btn icon', title: t('quick.title') + ' (Ctrl+P)', 'aria-label': t('quick.title'), onclick: () => run('quick.open') }, icon('file')),
       h('button', { class: 'btn icon', title: t('files.refresh'), 'aria-label': t('files.refresh'), onclick: () => run('files.refresh') }, icon('refresh')));
   };
 
@@ -56,12 +65,14 @@ export function center(el) {
     const k = [state.repo.id, state.wt.path, r.view, r.path].join('\n');
     if (k === key) {
       if (r.view === 'file' && r.line) view?.goLine?.(r.line);
+      view?.route?.(r);
       renderBar();
       return;
     }
     key = k;
     view?.destroy?.();
-    view = r.view === 'file' ? editorView(r) : r.view === 'changes' ? changesView(r) : treeView(r);
+    const make = { file: editorView, changes: changesView, search: searchView, history: historyView }[r.view] || treeView;
+    view = make(r);
     content.style.overflow = r.view === 'tree' ? 'auto' : 'hidden';
     mount(content, view.el);
     renderBar();

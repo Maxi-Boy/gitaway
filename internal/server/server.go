@@ -140,6 +140,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/github/key", s.api(s.handleGitHubKey))
 	mux.HandleFunc("/api/github/check", s.api(s.handleGitHubCheck))
 	mux.HandleFunc("/api/github/clone", s.api(s.handleGitHubClone))
+	mux.HandleFunc("/api/github/attach", s.api(s.handleGitHubAttach))
+	mux.HandleFunc("/api/files", s.api(s.handleFiles))
+	mux.HandleFunc("/api/search", s.api(s.handleSearch))
+	mux.HandleFunc("/api/log", s.api(s.handleLog))
+	mux.HandleFunc("/api/commit", s.api(s.handleCommit))
+	mux.HandleFunc("/api/commit/diff", s.api(s.handleCommitDiff))
 	s.registerGit(mux)
 	s.registerChanges(mux)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {

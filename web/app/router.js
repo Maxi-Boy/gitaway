@@ -1,5 +1,5 @@
 // Маршрут в адресе: #/repo/<id>/wt/<ветка>/tree/<папка>, .../file/<путь>:<строка>,
-// .../changes/<выбранный файл>.
+// .../changes/<выбранный файл>, .../search, .../history[/<коммит>][/path/<путь>].
 // Ветка кодируется целиком (в имени бывает "/"), путь кодируется по сегментам.
 // Перезагрузка страницы, «Назад» и сохранённые ссылки восстанавливают экран из адреса.
 
@@ -7,7 +7,7 @@ const enc = (s) => encodeURIComponent(s);
 const encPath = (p) => p.split('/').map(enc).join('/');
 
 export function parse(hash = location.hash) {
-  const r = { repo: '', wt: '', view: 'tree', path: '', line: 0 };
+  const r = { repo: '', wt: '', view: 'tree', path: '', line: 0, commit: '' };
   const parts = hash.replace(/^#\/?/, '').split('/');
   let i = 0;
   const next = () => parts[i++];
@@ -34,6 +34,15 @@ export function parse(hash = location.hash) {
         }
       }
       r.path = rest.filter(Boolean).map(dec).join('/');
+    } else if (key === 'search') {
+      r.view = 'search';
+    } else if (key === 'history') {
+      r.view = 'history';
+      if (/^[0-9a-f]{4,64}$/.test(parts[i] || '')) r.commit = next();
+      if (parts[i] === 'path') {
+        r.path = parts.slice(i + 1).filter(Boolean).map(dec).join('/');
+        i = parts.length;
+      }
     } else if (key === 'changes') {
       r.view = 'changes'; // необязательный путь дальше: выбранный файл
       r.path = parts.slice(i).filter(Boolean).map(dec).join('/');
@@ -48,6 +57,8 @@ export function format(r) {
   if (!r.repo) return s;
   s += 'repo/' + enc(r.repo);
   if (r.wt) s += '/wt/' + enc(r.wt);
+  if (r.view === 'search') return s + '/search';
+  if (r.view === 'history') return s + '/history' + (r.commit ? '/' + r.commit : '') + (r.path ? '/path/' + encPath(r.path) : '');
   if (r.view === 'changes') return s + '/changes' + (r.path ? '/' + encPath(r.path) : '');
   if (r.view === 'file' && r.path) return s + '/file/' + encPath(r.path) + (r.line ? ':' + r.line : '');
   if (r.path) s += '/tree/' + encPath(r.path);

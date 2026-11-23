@@ -66,20 +66,34 @@ func (s *Server) remoteURL(ref github.Ref, transport string) string {
 	return ref.SSHURL(transport)
 }
 
-// handleGitHubKey: POST {url} — deploy-ключ для репозитория (новый или уже созданный для него).
+// handleGitHubKey: POST {url} или {repo} — deploy-ключ для репозитория (новый или уже созданный для него).
 // В ответе открытая часть и ссылка на страницу добавления ключа в настройках репозитория.
 func (s *Server) handleGitHubKey(w http.ResponseWriter, r *http.Request, _ auth.Session) error {
 	if r.Method != http.MethodPost {
 		return errMethod
 	}
 	var req struct {
-		URL string `json:"url"`
+		URL  string `json:"url"`
+		Repo string `json:"repo"` // уже добавленный репозиторий: адрес берётся из его remote
 	}
 	if err := decodeJSON(w, r, &req); err != nil {
 		return err
 	}
-	ref, err := github.Parse(req.URL)
-	if err != nil {
+	var ref github.Ref
+	var err error
+	if req.Repo != "" {
+		repo, ok := s.repos.Get(req.Repo)
+		if !ok {
+			return errNotFound("repository")
+		}
+		dir, err := s.sandbox.Resolve(repo.Path)
+		if err != nil {
+			return err
+		}
+		if _, ref, err = s.githubRemote(r.Context(), dir); err != nil {
+			return err
+		}
+	} else if ref, err = github.Parse(req.URL); err != nil {
 		return errBad("%v", err)
 	}
 	key, ok := github.Key{}, false
@@ -301,4 +315,93 @@ func (s *Server) afterClone(sess *session.Session, unlock func(), dest string, r
 		}
 	}
 	s.log.Info("repository cloned", "repo", ref.String(), "dest", dest)
+}
+
+// githubRemote находит remote репозитория на github.com: origin, иначе первый подходящий.
+func (s *Server) githubRemote(ctx context.Context, dir string) (string, github.Ref, error) {
+	out, err := s.git.RunEnv(ctx, dir, []string{"GIT_OPTIONAL_LOCKS=0"}, "config", "--get-regexp", `^remote\..*\.url$`)
+	var ge *gitx.Error
+	if err != nil && !(errors.As(err, &ge) && ge.Code == 1) { // код 1: ни одного remote
+		return "", github.Ref{}, err
+	}
+	name, ref, found := "", github.Ref{}, false
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		key, url, ok := strings.Cut(line, " ")
+		if !ok {
+			continue
+		}
+		remote := strings.TrimSuffix(strings.TrimPrefix(key, "remote."), ".url")
+		rf, err := github.Parse(url)
+		if err != nil || gitx.ValidRemoteName(remote) != nil {
+			continue
+		}
+		if !found || remote == "origin" {
+			name, ref, found = remote, rf, true
+		}
+	}
+	if !found {
+		return "", github.Ref{}, &apiError{http.StatusBadRequest, "no_github_remote", "the repository has no github.com remote"}
+	}
+	return name, ref, nil
+}
+
+// handleGitHubAttach: POST {repo, key_id} — подключить проверенный deploy-ключ к уже
+// добавленному репозиторию: remote на github.com переводится на SSH, в .git/config пишется
+// core.sshCommand с ключом (общий для всех вкладок-веток). Ключ должен быть для того же
+// репозитория GitHub, что и remote.
+func (s *Server) handleGitHubAttach(w http.ResponseWriter, r *http.Request, _ auth.Session) error {
+	if r.Method != http.MethodPost {
+		return errMethod
+	}
+	var req struct {
+		Repo  string `json:"repo"`
+		KeyID string `json:"key_id"`
+	}
+	if err := decodeJSON(w, r, &req); err != nil {
+		return err
+	}
+	repo, ok := s.repos.Get(req.Repo)
+	if !ok {
+		return errNotFound("repository")
+	}
+	key, ok := s.findKey(req.KeyID)
+	if !ok {
+		return errNotFound("key")
+	}
+	if key.Transport == "" {
+		return &apiError{http.StatusConflict, "not_checked", "check access with the key first"}
+	}
+	dir, err := s.sandbox.Resolve(repo.Path)
+	if err != nil {
+		return err
+	}
+	unlock, ok := s.locks.TryLock(repo.ID)
+	if !ok {
+		return errBusy
+	}
+	defer unlock()
+	remote, ref, err := s.githubRemote(r.Context(), dir)
+	if err != nil {
+		return err
+	}
+	if !strings.EqualFold(ref.String(), key.Ref.String()) {
+		return errBad("the key is for %s, but the remote points to %s", key.Ref, ref)
+	}
+	sshCmd, err := s.sshCommand(key.ID)
+	if err != nil {
+		return err
+	}
+	url := s.remoteURL(key.Ref, key.Transport)
+	if _, err := s.git.Run(r.Context(), dir, "config", "core.sshCommand", sshCmd); err != nil {
+		return err
+	}
+	if _, err := s.git.Run(r.Context(), dir, "remote", "set-url", "--", remote, url); err != nil {
+		return err
+	}
+	if err := s.repos.SetKeyID(repo.ID, key.ID); err != nil {
+		return err
+	}
+	s.log.Info("deploy key attached", "repo", ref.String(), "path", dir, "remote", remote)
+	writeJSON(w, http.StatusOK, map[string]any{"remote": remote, "url": url})
+	return nil
 }

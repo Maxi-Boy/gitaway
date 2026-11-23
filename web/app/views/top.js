@@ -69,7 +69,10 @@ function repoMenu() {
   }
   if (!state.repos.length) items.push({ label: t('repo.none'), disabled: true, run() {} });
   items.push('-', { label: t('repo.add'), run: () => run('repo.add') });
-  if (state.repo) items.push({ label: t('repo.remove'), danger: true, run: () => act.removeRepo(state.repo) });
+  if (state.repo) {
+    items.push({ label: t('key.attachTitle') + '…', run: () => run('repo.attachKey') });
+    items.push({ label: t('repo.remove'), danger: true, run: () => act.removeRepo(state.repo) });
+  }
   return items;
 }
 

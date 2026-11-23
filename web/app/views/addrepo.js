@@ -1,6 +1,7 @@
 // Добавление репозитория: клонирование с GitHub через deploy-ключ (или публичный по HTTPS)
-// и подключение папки, которая уже есть на сервере.
-import { h, mount, dialog, toast } from '../ui.js';
+// и подключение папки, которая уже есть на сервере. Тот же шаг с ключом подключает
+// deploy-ключ к уже добавленному репозиторию (attachKeyDialog).
+import { h, mount, dialog, toast, confirm } from '../ui.js';
 import { t } from '../i18n.js';
 import { api } from '../api.js';
 import { state, emit } from '../store.js';
@@ -63,41 +64,10 @@ export function addRepoDialog(mode = 'github') {
   };
 
   // шаг 2: ключ, ссылка на настройки репозитория, проверка доступа
-  const keyStep = (v, key) => {
-    const status = h('div', { class: 'check-status', 'aria-live': 'polite' });
-    const cloneBtn = h('button', { class: 'btn primary', disabled: !key.transport, onclick: () => startClone({ key_id: key.key_id, dest: v.dest }) }, t('add.clone'));
-    const check = async () => {
-      mount(status, h('span', { class: 'muted' }, t('add.checking')));
-      try {
-        const res = await api.post('/api/github/check', { key_id: key.key_id });
-        if (res.ok) {
-          mount(status, h('span', { class: 'ok' }, t('add.checkOk', { via: res.transport === 'ssh443' ? '443' : '22' })));
-          cloneBtn.disabled = false;
-          cloneBtn.focus();
-        } else {
-          mount(status, h('div', { class: 'bad' }, t('add.fail.' + (res.code || 'other'))),
-            res.output ? h('pre', { class: 'check-out' }, res.output) : null);
-        }
-      } catch (err) {
-        mount(status, h('div', { class: 'bad' }, err.message));
-      }
-    };
-    const pubKey = h('textarea', { class: 'mono key-box', readonly: true, rows: 3, 'aria-label': t('add.publicKey') });
-    pubKey.value = key.public_key;
-    mount(body,
-      h('p', {}, t('add.keyIntro', { repo: key.owner + '/' + key.repo })),
-      h('div', { class: 'form-row' }, h('b', {}, t('add.step1')), pubKey,
-        h('div', { class: 'field' }, h('button', { class: 'btn small', onclick: () => { pubKey.select(); copyText(key.public_key); } }, t('add.copyKey')))),
-      h('div', { class: 'form-row' }, h('b', {}, t('add.step2')),
-        h('div', { class: 'field' }, h('a', { class: 'btn', href: key.keys_url, target: '_blank', rel: 'noopener noreferrer' }, t('add.openGitHub'))),
-        h('ul', { class: 'hint-list' }, h('li', {}, t('add.hintTitle', { title: key.title })), h('li', {}, t('add.hintKey')), h('li', {}, t('add.hintWrite')))),
-      h('div', { class: 'form-row' }, h('b', {}, t('add.step3')),
-        h('div', { class: 'field' }, h('button', { class: 'btn', onclick: check }, t('add.check'))), status),
-      h('div', { class: 'field' },
-        h('button', { class: 'btn', onclick: () => githubStep(v) }, t('add.back')), h('span', { class: 'grow' }),
-        h('button', { class: 'btn', onclick: () => d.close() }, t('common.cancel')), cloneBtn));
-    if (key.transport) mount(status, h('span', { class: 'ok' }, t('add.checkedBefore')));
-  };
+  const keyStep = (v, key) => keyStepInto(body, key, {
+    back: () => githubStep(v), cancel: () => d.close(),
+    finishLabel: t('add.clone'), finish: () => startClone({ key_id: key.key_id, dest: v.dest }),
+  });
 
   const startClone = async (req) => {
     try {
@@ -135,6 +105,79 @@ export function addRepoDialog(mode = 'github') {
   d = dialog({ title: t('add.title'), body, mid: true });
   if (mode === 'local') localStep();
   else githubStep();
+}
+
+// keyStepInto рисует шаг с ключом: скопировать, добавить на GitHub, проверить доступ.
+// После удачной проверки становится доступна кнопка o.finish (клонировать или подключить).
+function keyStepInto(box, key, o) {
+  const status = h('div', { class: 'check-status', 'aria-live': 'polite' });
+  const finishBtn = h('button', { class: 'btn primary', disabled: !key.transport, onclick: () => o.finish() }, o.finishLabel);
+  const check = async () => {
+    mount(status, h('span', { class: 'muted' }, t('add.checking')));
+    try {
+      const res = await api.post('/api/github/check', { key_id: key.key_id });
+      if (res.ok) {
+        mount(status, h('span', { class: 'ok' }, t('add.checkOk', { via: res.transport === 'ssh443' ? '443' : '22' })));
+        finishBtn.disabled = false;
+        finishBtn.focus();
+      } else {
+        mount(status, h('div', { class: 'bad' }, t('add.fail.' + (res.code || 'other'))),
+          res.output ? h('pre', { class: 'check-out' }, res.output) : null);
+      }
+    } catch (err) {
+      mount(status, h('div', { class: 'bad' }, err.message));
+    }
+  };
+  const pubKey = h('textarea', { class: 'mono key-box', readonly: true, rows: 3, 'aria-label': t('add.publicKey') });
+  pubKey.value = key.public_key;
+  mount(box,
+    h('p', {}, t('add.keyIntro', { repo: key.owner + '/' + key.repo })),
+    h('div', { class: 'form-row' }, h('b', {}, t('add.step1')), pubKey,
+      h('div', { class: 'field' }, h('button', { class: 'btn small', onclick: () => { pubKey.select(); copyText(key.public_key); } }, t('add.copyKey')))),
+    h('div', { class: 'form-row' }, h('b', {}, t('add.step2')),
+      h('div', { class: 'field' }, h('a', { class: 'btn', href: key.keys_url, target: '_blank', rel: 'noopener noreferrer' }, t('add.openGitHub'))),
+      h('ul', { class: 'hint-list' }, h('li', {}, t('add.hintTitle', { title: key.title })), h('li', {}, t('add.hintKey')), h('li', {}, t('add.hintWrite')))),
+    h('div', { class: 'form-row' }, h('b', {}, t('add.step3')),
+      h('div', { class: 'field' }, h('button', { class: 'btn', onclick: check }, t('add.check'))), status),
+    h('div', { class: 'field' },
+      o.back ? h('button', { class: 'btn', onclick: o.back }, t('add.back')) : null, h('span', { class: 'grow' }),
+      h('button', { class: 'btn', onclick: o.cancel }, t('common.cancel')), finishBtn));
+  if (key.transport) mount(status, h('span', { class: 'ok' }, t('add.checkedBefore')));
+}
+
+// attachKeyDialog подключает deploy-ключ к уже добавленному репозиторию: origin на github.com
+// переводится на SSH с этим ключом (fetch, pull, push без логина и пароля).
+export async function attachKeyDialog(repo) {
+  let key;
+  try {
+    key = await api.post('/api/github/key', { repo: repo.id });
+  } catch (err) {
+    toast(err.code === 'no_github_remote' ? t('key.noGithubRemote') : err.message, { bad: true });
+    return;
+  }
+  const box = h('div', { class: 'form' });
+  const d = dialog({ title: t('key.attachTitle'), body: box, mid: true });
+  keyStepInto(box, key, {
+    cancel: () => d.close(),
+    finishLabel: t('key.attach'),
+    finish: async () => {
+      try {
+        await api.post('/api/github/attach', { repo: repo.id, key_id: key.key_id });
+        d.close();
+        toast(t('key.attached'));
+        act.refreshAll();
+      } catch (err) {
+        toast(err.message, { bad: true });
+      }
+    },
+  });
+}
+
+// loginNeeded объясняет ошибку «git не смог войти» и предлагает подключить deploy-ключ.
+export async function loginNeeded(op, detail) {
+  const ok = await confirm(t('key.loginTitle'),
+    h('div', {}, h('p', {}, t('key.loginBody', { op })), h('pre', { class: 'check-out' }, detail)), t('key.attachTitle') + '…');
+  if (ok && state.repo) attachKeyDialog(state.repo);
 }
 
 // cloneFinished вызывается терминалом, когда клонирование завершилось на глазах у пользователя.

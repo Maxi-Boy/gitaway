@@ -15,6 +15,9 @@ import { registerTreeCommands } from './views/tree.js';
 import { currentEditor } from './views/editor.js';
 import { addRepoDialog } from './views/addrepo.js';
 import { selectedTask, runTask, editMine, rerunLast } from './views/tasks.js';
+import { quickOpen } from './views/quickopen.js';
+import { setSearchPrefill, editorSelection } from './views/search.js';
+import { attachKeyDialog } from './views/addrepo.js';
 
 const app = document.getElementById('app');
 
@@ -77,7 +80,7 @@ function buildShell() {
   topbar(top);
   tabs(tabBar);
   left(leftEl);
-  center(centerEl);
+  state.center = center(centerEl);
   const d = dock(dockEl);
   state.dock = d;
   serverPanel(rightEl);
@@ -122,6 +125,23 @@ function registerCommands() {
   register({ id: 'branch.new', title: t('branches.new'), when: () => !!state.repo, run: newBranch });
   register({ id: 'view.files', title: t('cmd.files'), when: hasWt, run: () => act.nav({ view: 'tree', path: '' }) });
   register({ id: 'view.changes', title: t('cmd.changes'), keys: 'Ctrl+Shift+G', when: hasWt, run: () => act.nav({ view: 'changes', path: '' }) });
+  register({ id: 'view.history', title: t('cmd.history'), keys: 'Ctrl+Shift+H', when: hasWt, run: () => act.nav({ view: 'history', path: '', commit: '' }) });
+  register({ id: 'history.file', title: t('cmd.fileHistory'), when: () => hasWt() && state.route.view === 'file',
+    run: () => act.nav({ view: 'history', path: state.route.path, commit: '' }) });
+  register({ id: 'quick.open', title: t('quick.title'), keys: 'Ctrl+P', when: hasWt, run: quickOpen });
+  register({ id: 'search.show', title: t('search.title'), keys: 'Ctrl+Shift+F', when: hasWt, run: () => {
+    const sel = editorSelection();
+    if (innerWidth < 900) setPane('center');
+    if (state.route.view === 'search') {
+      const v = state.center?.current();
+      if (sel) v?.setQuery?.(sel);
+      else v?.focus?.();
+      return;
+    }
+    setSearchPrefill(sel);
+    act.nav({ view: 'search', path: '' });
+  } });
+  register({ id: 'repo.attachKey', title: t('key.attachTitle'), when: () => !!state.repo, run: () => attachKeyDialog(state.repo) });
   register({ id: 'file.save', title: t('file.save'), keys: 'Ctrl+S', when: () => !!currentEditor(), run: () => currentEditor().save() });
   register({ id: 'dock.output', title: t('cmd.output'), keys: 'Ctrl+J', run: () => state.dock?.show('output') });
   register({ id: 'term.new', title: t('term.new'), keys: 'Ctrl+`', inTerminal: true, run: () => {

@@ -63,6 +63,20 @@ const commits = {
 };
 const files = { 'README.md': '# myrepo\n\nПример файла.\n', 'server.go': 'package main\n\nfunc main() {\n\tprintln("hi")\n}\n' };
 let fileVer = 1;
+// поиск, быстрое открытие и история
+const allFiles = ['README.md', 'server.go', 'worktree.go', 'api/pull.go', 'auth/pam.go', 'git/branches.go', 'git/status.go', 'web/app/main.js'];
+const texts = {
+  'server.go': 'package main\n\nfunc main() {\n\tprintln("hi") // TODO: config\n}\n',
+  'git/status.go': 'package git\n\n// TODO: parse renames\nfunc Status() {}\n',
+  'api/pull.go': 'package api\n\nfunc Pull() { /* todo */ }\n',
+};
+const history = [
+  { hash: 'c9a1f0e2b3c4d5e6f708192a3b4c5d6e7f809102', subject: 'Add pull endpoint, ff-only', author: 'i.petrov', time: now - 2 * H, refs: ['feature/login'], files: [['M', 'api/pull.go', 12, 3], ['A', 'api/pull_test.go', 40, 0]] },
+  { hash: 'b8f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4', subject: 'Parse ahead/behind counters', author: 'sysadmin', time: now - 22 * H, refs: ['origin/feature/login'], files: [['M', 'git/status.go', 20, 4]] },
+  { hash: 'a7e3d2c1b0a9f8e7d6c5b4a3f2e1d0c9b8a7f6e5', subject: 'Wire auth middleware', author: 'sysadmin', time: now - 25 * H, refs: ['tag: v0.1.0'], files: [['M', 'server.go', 8, 2], ['R', 'auth/pam.go', 3, 1, 'auth/login.go']] },
+  { hash: 'f6d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6', subject: 'Initial commit', author: 'sysadmin', time: now - 9 * 24 * H, refs: [], files: [['A', 'README.md', 3, 0], ['A', 'server.go', 5, 0]] },
+];
+let attached = false;
 const merging = {};
 const forceNeeded = new Set(['fix/api-timeout']);
 let myTasks = [];
@@ -208,7 +222,48 @@ http.createServer(async (req, res) => {
       }
       return json(res, 200, res2);
     }
+    case '/api/files': return json(res, 200, { files: allFiles });
+    case '/api/search': {
+      if (!q.q?.trim()) return err(res, 400, 'bad_request', 'empty search query');
+      const needle = q.case === '1' ? q.q : q.q.toLowerCase();
+      const matches = [];
+      for (const [path, text] of Object.entries(texts)) {
+        text.split('\n').forEach((line, i) => {
+          const hay = q.case === '1' ? line : line.toLowerCase();
+          const col = hay.indexOf(needle);
+          if (col >= 0) matches.push({ path, line: i + 1, col: col + 1, text: line });
+        });
+      }
+      return json(res, 200, { matches, files: new Set(matches.map((m) => m.path)).size });
+    }
+    case '/api/log': {
+      const list = history.filter((c) => !q.path || c.files.some((f) => f[1] === q.path || f[1].startsWith(q.path + '/')));
+      const skip = Number(q.skip || 0);
+      const out = list.slice(skip, skip + Number(q.limit || 100)).map(({ files: _f, ...c }, i) => ({
+        ...c, email: c.author + '@example.com', parents: [history[history.indexOf(list[skip + i]) + 1]?.hash].filter(Boolean),
+        unpushed: q.wt?.includes('feature') && c.hash === history[0].hash,
+      }));
+      return json(res, 200, { commits: out, more: skip + out.length < list.length });
+    }
+    case '/api/commit': {
+      const c = history.find((x) => x.hash.startsWith(q.hash));
+      if (!c) return err(res, 400, 'bad_request', 'commit not found: ' + q.hash);
+      const next = history[history.indexOf(c) + 1];
+      return json(res, 200, {
+        hash: c.hash, subject: c.subject, author: c.author, email: c.author + '@example.com', time: c.time, refs: c.refs,
+        parents: next ? [next.hash] : [], body: c === history[0] ? 'Pull только fast-forward: без слияний на сервере.' : '',
+        committer: c.author, commit_time: c.time,
+        files: c.files.map(([status, path, added, deleted, old]) => ({ status, path, added, deleted, ...(old ? { old_path: old } : {}) })),
+      });
+    }
+    case '/api/commit/diff':
+      return json(res, 200, { path: q.path, text: `diff --git a/${q.path} b/${q.path}\nindex 1a2b3c..4d5e6f 100644\n--- a/${q.path}\n+++ b/${q.path}\n@@ -1,3 +1,4 @@\n package api\n-func Pull() {}\n+func Pull() error {\n+\treturn nil\n+}\n` });
+    case '/api/github/attach':
+      attached = true;
+      return json(res, 200, { remote: 'origin', url: 'git@github.com:Maxi-Boy/myrepo.git' });
     case '/api/github/key':
+      if (b.repo === 'r2') return err(res, 400, 'no_github_remote', 'the repository has no github.com remote');
+      if (b.repo) return json(res, 200, { ...ghKey, key_id: 'maxi-myrepo-1', owner: 'Maxi-Boy', repo: 'myrepo', keys_url: 'https://github.com/Maxi-Boy/myrepo/settings/keys/new' });
       if (!/^(https:\/\/github\.com\/)?[\w-]+\/[\w.-]+/.test(b.url)) return err(res, 400, 'bad_request', 'not a github.com repository address');
       return json(res, 200, ghKey);
     case '/api/github/check':
@@ -260,6 +315,7 @@ http.createServer(async (req, res) => {
     if (op === 'unstage') { changes[wt] = changes[wt].map((c) => (b.paths.includes(c.path) || b.paths.includes('.') ? { ...c, x: c.x === 'A' ? '?' : ' ', y: c.x === 'A' ? '?' : c.x } : c)); return json(res, 200, { status: status(b.wt) }); }
     if (op === 'discard') { changes[wt] = changes[wt].filter((c) => !b.paths.includes(c.path)); return json(res, 200, { discarded: b.paths, status: status(b.wt) }); }
     if (op === 'commit') { changes[wt] = changes[wt].filter((c) => c.x === ' ' || c.x === '?').map((c) => c); return json(res, 200, { commit: 'abcdef1234567890abcdef1234567890abcdef12', output: '[feature/login abcdef1] ' + b.message, status: status(b.wt) }); }
+    if (op === 'pull' && !b.wt?.includes('feature') && !attached) return err(res, 422, 'auth_required', "git pull --ff-only: exit 1: fatal: could not read Username for 'https://github.com': terminal prompts disabled");
     if (op === 'push') return err(res, 422, 'git_failed', 'git push: exit 1: ! [rejected] feature/login -> feature/login (non-fast-forward)');
     if (op === 'merge' && b.branch === 'origin/release-2.1') {
       merging[wt] = true;

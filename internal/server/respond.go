@@ -76,6 +76,8 @@ func (s *Server) fail(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusBadRequest, "bad_path", err.Error())
 	case errors.Is(err, gitx.ErrUnknownWorktree), errors.Is(err, fs.ErrNotExist):
 		writeError(w, http.StatusNotFound, "not_found", "not found")
+	case errors.As(err, &ge) && gitx.NeedsLogin(err):
+		writeError(w, http.StatusUnprocessableEntity, "auth_required", ge.Error())
 	case errors.As(err, &ge):
 		writeError(w, http.StatusUnprocessableEntity, "git_failed", ge.Error())
 	default:

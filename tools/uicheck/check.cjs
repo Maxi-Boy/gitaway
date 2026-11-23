@@ -249,6 +249,82 @@ require('fs').mkdirSync(OUT, { recursive: true });
   });
   await page.screenshot({ path: OUT + '/17-cloned.png' });
 
+  // быстрое открытие, поиск по проекту, история
+  await page.goto(URL + '#/repo/r1/wt/feature%2Flogin');
+  await page.waitForSelector('.center .row:has-text("server.go")');
+  await step('quick open: Ctrl+P finds a file by part of the name', async () => {
+    await page.keyboard.press('Control+P');
+    await page.waitForSelector('.dialog.palette:has-text("Открыть файл")');
+    await page.fill('.palette input', 'stat:3');
+    await page.waitForSelector('.palette .results button.on:has-text("status.go") mark');
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(() => decodeURIComponent(location.hash).endsWith('/file/git/status.go:3'));
+  });
+  await step('search: Ctrl+Shift+F, results by file, click opens the line', async () => {
+    await page.keyboard.press('Control+Shift+F');
+    await page.waitForSelector('.search input[type=search]');
+    await page.fill('.search input[type=search]', 'todo');
+    await page.waitForSelector('.search-sum:has-text("Совпадений: 3 в файлах: 3")');
+    await page.waitForSelector('.sline mark:text-is("TODO")');
+    await page.click('.search button[aria-label="Учитывать регистр"]');
+    await page.waitForSelector('.search-sum:has-text("Совпадений: 1")');
+    await page.click('.search button[aria-label="Учитывать регистр"]');
+    await page.waitForSelector('.search-sum:has-text("Совпадений: 3")');
+  });
+  await page.screenshot({ path: OUT + '/19-search.png' });
+  await step('search: result opens file at line, query is kept', async () => {
+    await page.click('.sline:has-text("parse renames")');
+    await page.waitForFunction(() => decodeURIComponent(location.hash).endsWith('/file/git/status.go:3'));
+    await page.click('.center .bar button[aria-label="Поиск по проекту"]');
+    await page.waitForSelector('.sline:has-text("parse renames")');
+    if (await page.inputValue('.search input[type=search]') !== 'todo') throw new Error('query lost');
+  });
+  await step('history: commits, refs, unpushed mark and commit details', async () => {
+    await page.click('.center .bar .seg button:has-text("История")');
+    await page.waitForSelector('.commit-row.sel:has-text("Add pull endpoint")');
+    await page.waitForSelector('.commit-row .badge.unpushed');
+    await page.waitForSelector('.commit-row .badge.ref.tag:has-text("v0.1.0")');
+    await page.waitForSelector('.commit-detail h3:has-text("Add pull endpoint")');
+    await page.waitForSelector('.commit-detail .commit-body:has-text("fast-forward")');
+    await page.click('.cfile-head:has-text("api/pull.go")');
+    await page.waitForSelector('.cfile-diff .diff .a:has-text("return nil")');
+    await page.waitForFunction(() => /\/history\/c9a1f0e2/.test(location.hash));
+  });
+  await page.screenshot({ path: OUT + '/20-history.png' });
+  await step('history: rename, parent link and keyboard', async () => {
+    await page.click('.commit-row:has-text("Wire auth middleware")');
+    await page.waitForSelector('.cfile-head:has-text("auth/login.go → auth/pam.go")');
+    await page.click('.commit-meta .linkish');
+    await page.waitForSelector('.commit-detail h3:has-text("Initial commit")');
+    await page.keyboard.press('ArrowUp');
+    await page.waitForSelector('.commit-detail h3:has-text("Wire auth middleware")');
+  });
+  await step('history: file history from the file table', async () => {
+    await page.click('.center .bar .seg button:has-text("Файлы")');
+    await page.click('.row:has-text("server.go")', { button: 'right' });
+    await page.click('.menu button:has-text("История файла")');
+    await page.waitForSelector('.notice:has-text("История: server.go")');
+    await page.waitForFunction(() => document.querySelectorAll('.commit-row').length === 2);
+    await page.click('.notice button:has-text("Вся ветка")');
+    await page.waitForFunction(() => document.querySelectorAll('.commit-row').length === 4);
+  });
+  await step('auth: pull without login offers a deploy key', async () => {
+    await page.click('.tab:has-text("main")');
+    await page.click('.topbar button:has-text("Pull")');
+    await page.waitForSelector('.dialog:has-text("Нужен вход на сервер репозитория") pre:has-text("could not read Username")');
+    await page.click('.dialog footer button:has-text("Подключить deploy-ключ")');
+    await page.waitForSelector('.dialog a[href="https://github.com/Maxi-Boy/myrepo/settings/keys/new"]');
+    await page.click('.dialog button:has-text("Проверить доступ")');
+    await page.waitForSelector('.dialog .ok:has-text("через порт 443")');
+  });
+  await page.screenshot({ path: OUT + '/21-attach-key.png' });
+  await step('auth: connect the key, pull works', async () => {
+    await page.click('.dialog button:text-is("Подключить")');
+    await page.waitForSelector('.toast:has-text("Ключ подключён")');
+    await page.click('.topbar button:has-text("Pull")');
+    await page.waitForSelector('.log-entry .cmd.ok:has-text("git pull")');
+  });
+
   // телефон
   const m = await browser.newContext({ ...devices['iPhone 13'], locale: 'ru-RU' });
   const mp = await m.newPage();
@@ -276,6 +352,19 @@ require('fs').mkdirSync(OUT, { recursive: true });
     await mp.waitForSelector('.term-keys button:has-text("Esc")');
   });
   await mp.screenshot({ path: OUT + '/11-mobile-out.png' });
+  await step('mobile: history list, then commit, then back', async () => {
+    await mp.click('.mnav button:has-text("Файлы")');
+    await mp.click('.center .bar .seg button:has-text("История")');
+    await mp.waitForSelector('.commit-row:has-text("Parse ahead")');
+    await mp.click('.commit-row:has-text("Parse ahead")');
+    await mp.waitForSelector('.commit-detail h3:has-text("Parse ahead")');
+    if (await mp.isVisible('.commit-row')) throw new Error('list must hide on a phone');
+  });
+  await mp.screenshot({ path: OUT + '/22-mobile-commit.png' });
+  await step('mobile: back to the list', async () => {
+    await mp.click('.commit-detail button:has-text("История")');
+    await mp.waitForSelector('.commit-row:has-text("Parse ahead")');
+  });
 
   // английский интерфейс: переключатель на экране входа, выбор запоминается
   const en = await browser.newContext({ viewport: { width: 1440, height: 860 }, locale: 'ru-RU' });
