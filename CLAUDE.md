@@ -46,6 +46,7 @@ CI (`.github/workflows/ci.yml`) на каждый push: build, vet, test -race, 
     packaging/         systemd-юнит gitaway@.service, пример nginx
     tools/uicheck/     заглушка API и сценарий Playwright: проверка интерфейса без Go
     tools/vendor/      сборка web/vendor/ (CodeMirror, xterm.js) из закреплённых тегов GitHub
+    vendor/            зависимости Go (go mod vendor): сборка без доступа к proxy.golang.org
 
 ## Правила (не нарушать без явного решения пользователя)
 
@@ -68,6 +69,7 @@ CI (`.github/workflows/ci.yml`) на каждый push: build, vet, test -race, 
 - Фронтенд без шага сборки: обычные ES-модули, без фреймворка. Сторонние библиотеки
   (xterm.js, редактор) кладутся в `web/vendor/` с лицензией и закреплённой версией.
   CDN нельзя: CSP сервера `default-src 'self'`, и сервер может быть без интернета.
+- Зависимости Go лежат в `vendor/` (сборка без сети). После изменения go.mod: `go mod vendor`.
 - Не делаем: плагины, LSP, многопользовательский режим, редактор конфликтов слияния,
   API других хостингов кроме GitHub.
 
