@@ -6,7 +6,7 @@ import { events, isOnline } from '../api.js';
 import { run } from '../commands.js';
 import { go } from '../router.js';
 import * as act from '../actions.js';
-import { openTaskMenu } from './tasks.js';
+import { taskControls } from './tasks.js';
 
 const base = (p) => p.split('/').filter(Boolean).pop() || p;
 
@@ -46,8 +46,8 @@ export function topbar(el) {
         t('git.pull'), st?.behind ? ' ↓' + st.behind : ''),
       h('button', { class: 'btn' + (st?.ahead ? ' primary' : ''), disabled: !has, onclick: () => run('git.push') },
         t('git.push'), st?.ahead ? ' ↑' + st.ahead : ''),
-      h('button', { class: 'btn task-btn', 'aria-haspopup': 'menu', title: t('tasks.button') + ' (Ctrl+Shift+B: ' + t('tasks.rerunShort') + ')',
-        onclick: (e) => openTaskMenu(e.currentTarget) }, '▶', h('span', { class: 'wide-only' }, ' ' + t('tasks.button'))),
+      h('span', { class: 'sep wide-only' }),
+      h('span', { class: 'wide-only' }, taskControls()),
       h('span', { class: 'grow' }),
       conn,
       h('button', { class: 'btn icon', title: t('palette.title') + ' (Ctrl+K)', 'aria-label': t('palette.title'), onclick: () => run('palette') }, icon('search')),
@@ -55,7 +55,7 @@ export function topbar(el) {
       userBtn,
     );
   };
-  on('repo repos status wt fs me', render);
+  on('repo repos status wt fs me tasks', render);
   render();
 }
 

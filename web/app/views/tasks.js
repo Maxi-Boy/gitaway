@@ -1,25 +1,35 @@
 // Задачи: мои скрипты, задачи из .gitaway.json (после одобрения) и автоопределённые.
 // Запуск идёт сеансом на сервере: вывод открывается в терминале и переживает закрытие браузера.
-import { h, mount, dialog, confirm, toast, menuAt, stamp } from '../ui.js';
+import { h, mount, dialog, confirm, toast, stamp } from '../ui.js';
 import { t } from '../i18n.js';
 import { api } from '../api.js';
 import { state, emit, on, wtParam } from '../store.js';
 
-const RECENT_KEY = 'gitaway:recent-tasks';
+// Выбранная задача запоминается для каждого репозитория (как конфигурация запуска в IDE).
+const SEL_KEY = 'gitaway:task-selected';
 
-function readRecent() {
+function readSelected() {
   try {
-    return JSON.parse(localStorage.getItem(RECENT_KEY)) || [];
+    return JSON.parse(localStorage.getItem(SEL_KEY)) || {};
   } catch {
-    return [];
+    return {};
   }
 }
 
-function remember(task) {
-  const list = [{ id: task.id, name: task.name, repo: state.repo?.id || '' }, ...readRecent().filter((r) => r.id !== task.id)].slice(0, 5);
+export function setSelected(id) {
+  const all = readSelected();
+  all[state.repo?.id || ''] = id;
   try {
-    localStorage.setItem(RECENT_KEY, JSON.stringify(list));
+    localStorage.setItem(SEL_KEY, JSON.stringify(all));
   } catch { /* не запомнится */ }
+  emit('tasks');
+}
+
+// selectedTask возвращает выбранную задачу; если выбора нет или задачи больше нет, первую из списка.
+export function selectedTask() {
+  const list = allTasks();
+  const id = readSelected()[state.repo?.id || ''];
+  return list.find((x) => x.id === id) || list[0] || null;
 }
 
 // loadTasks перечитывает задачи для активной вкладки.
@@ -46,7 +56,6 @@ export async function runTask(task) {
   askNotify();
   try {
     const info = await api.post('/api/tasks/run', { repo: state.repo?.id || '', wt: wtParam(), id: task.id, cols: 120, rows: 30 });
-    remember(task);
     state.lastTask = task;
     if (innerWidth < 900) { state.pane = 'out'; emit('pane'); }
     await state.dock?.openSession(info);
@@ -59,8 +68,9 @@ export async function runTask(task) {
   }
 }
 
+// rerunLast повторяет последнюю задачу, а если ещё ничего не запускалось, выбранную.
 export function rerunLast() {
-  const last = state.lastTask && allTasks().find((x) => x.id === state.lastTask.id);
+  const last = (state.lastTask && allTasks().find((x) => x.id === state.lastTask.id)) || selectedTask();
   if (last) return runTask(last);
   toast(t('tasks.noLast'));
   return null;
@@ -94,24 +104,27 @@ async function trustDialog() {
   return true;
 }
 
-// taskMenu это выпадающий список «▶»: последние, мои, репозиторий, автоопределение.
-export async function openTaskMenu(anchor) {
-  await loadTasks();
+// taskControls это блок в верхней панели: выпадающий список задач, «▶» и «Скрипты».
+export function taskControls() {
   const tk = state.tasks || {};
-  const item = (task, note) => ({ label: task.name + (note ? '  · ' + note : ''), run: () => runTask(task) });
-  const items = [];
-  const known = new Map(allTasks().map((x) => [x.id, x]));
-  const recent = readRecent().map((r) => known.get(r.id)).filter(Boolean);
-  if (recent.length) items.push({ section: t('tasks.recent') }, ...recent.map((x) => item(x)));
-  if (tk.mine?.length) items.push({ section: t('tasks.mine') }, ...tk.mine.map((x) => item(x)));
-  if (tk.repo?.tasks?.length) {
-    items.push({ section: t('tasks.repo') }, ...tk.repo.tasks.map((x) => item(x, tk.repo.trusted ? '' : t('tasks.needsTrust'))));
-  }
-  if (tk.repo?.error) items.push({ label: t('tasks.repoError', { err: tk.repo.error }), disabled: true, run() {} });
-  if (tk.auto?.length) items.push({ section: t('tasks.auto') }, ...tk.auto.map((x) => item(x)));
-  if (items.length === 0) items.push({ label: t('tasks.none'), disabled: true, run() {} });
-  items.push('-', { label: t('tasks.editMine'), run: () => editMine() });
-  menuAt(anchor, items);
+  const sel = selectedTask();
+  const opt = (task, note) => h('option', { value: task.id, selected: sel?.id === task.id }, task.name + (note ? ' · ' + note : ''));
+  const group = (label, list, note) => (list?.length ? h('optgroup', { label }, list.map((x) => opt(x, note))) : null);
+  const select = h('select', {
+    class: 'task-select', 'aria-label': t('tasks.select'), title: sel ? sel.steps.join(' ; ') : '',
+    disabled: !sel, onchange: (e) => setSelected(e.target.value),
+  },
+  sel ? null : h('option', {}, t('tasks.none')),
+  group(t('tasks.mine'), tk.mine),
+  group(t('tasks.repo'), tk.repo?.tasks, tk.repo && !tk.repo.trusted ? t('tasks.needsTrust') : ''),
+  group(t('tasks.auto'), tk.auto));
+  return h('span', { class: 'task-controls' }, select,
+    h('button', {
+      class: 'btn task-run', disabled: !sel, 'aria-label': t('tasks.run'),
+      title: sel ? t('tasks.runNamed', { name: sel.name }) : t('tasks.none'),
+      onclick: () => { const x = selectedTask(); if (x) runTask(x); },
+    }, '▶'),
+    h('button', { class: 'btn task-edit', title: t('tasks.editMine'), onclick: () => editMine() }, t('tasks.scripts')));
 }
 
 // --- уведомление о завершении ---
@@ -136,7 +149,7 @@ export function taskFinished(info) {
 
 // --- редактор моих скриптов ---
 
-async function editMine() {
+export async function editMine() {
   let list;
   try {
     list = await api.get('/api/tasks/mine');

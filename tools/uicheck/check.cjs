@@ -182,9 +182,9 @@ require('fs').mkdirSync(OUT, { recursive: true });
     await page.waitForFunction(() => document.querySelector('.term-screen:not([hidden]) .xterm-rows')?.textContent.includes('/home/sysadmin/projects/myrepo'));
   });
 
-  await step('tasks: create my script in the editor', async () => {
-    await page.click('.task-btn');
-    await page.click('.menu button:has-text("Мои скрипты…")');
+  await step('tasks: select lists detected tasks, Scripts opens the editor', async () => {
+    await page.waitForSelector('.task-select optgroup[label="Найдены в проекте"] option:has-text("go test")', { state: 'attached' });
+    await page.click('.task-edit');
     await page.click('.dialog footer button:has-text("Новый скрипт")');
     await page.fill('.dialog input[aria-label="Название"]', 'Сборка и бэкап');
     await page.fill('.dialog textarea[aria-label="Команды, по одной в строке"]', 'make build\ntar czf ~/b-{branch}.tgz bin/');
@@ -192,20 +192,23 @@ require('fs').mkdirSync(OUT, { recursive: true });
     await page.waitForSelector('.dialog .task-row:has-text("Сборка и бэкап")');
   });
   await page.screenshot({ path: OUT + '/13-scripts.png' });
-  await step('tasks: run from the menu, tab gets ✓', async () => {
+  await step('tasks: choose in the list and run with ▶, tab gets ✓', async () => {
     await page.keyboard.press('Escape');
-    await page.click('.task-btn');
-    await page.waitForSelector('.menu .label:has-text("Найдены в проекте")');
-    await page.click('.menu button:has-text("Сборка и бэкап")');
+    await page.selectOption('.task-select', { label: 'Сборка и бэкап' });
+    await page.click('.task-run');
     await page.waitForSelector('.term-tabs .t.on:has-text("▶ Сборка и бэкап")');
     await page.waitForSelector('.term-tabs .t.on .ok');
     await page.waitForSelector('.tab.active .badge.ok');
     await page.waitForFunction(() => document.querySelector('.term-screen:not([hidden]) .xterm-rows').textContent.includes('готово'));
   });
   await page.screenshot({ path: OUT + '/14-task-run.png' });
+  await step('tasks: selection is remembered after reload', async () => {
+    await page.reload();
+    await page.waitForFunction(() => document.querySelector('.task-select')?.selectedOptions[0]?.textContent === 'Сборка и бэкап');
+  });
   await step('tasks: repository task asks for trust first', async () => {
-    await page.click('.task-btn');
-    await page.click('.menu button:has-text("Линтер")');
+    await page.selectOption('.task-select', { label: 'Линтер · нужно одобрить' });
+    await page.click('.task-run');
     await page.waitForSelector('.dialog:has-text("Доверять задачам этого репозитория?") li:has-text("golangci-lint run")');
     await page.click('.dialog footer button:has-text("Доверять и запустить")');
     await page.waitForSelector('.term-tabs .t.on:has-text("▶ Линтер")');

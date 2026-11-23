@@ -287,6 +287,10 @@ body:not(.fs-open) .right { display: none; }
 .login .err { color: var(--bad); min-height: 1.4em; }
 
 /* задачи */
+.task-controls { display: inline-flex; align-items: center; gap: 6px; }
+.task-select { max-width: 220px; background: var(--ctl); color: var(--text); border: 1px solid var(--ctl-line); border-radius: 6px; padding: 5px 8px; font-weight: 500; cursor: pointer; }
+.task-select:disabled { opacity: .6; cursor: default; }
+.task-run { color: var(--good); padding: 5px 10px; }
 .badge.ok, .ok { color: var(--good); }
 .badge.bad, .bad { color: var(--bad); }
 .task-row { display: flex; align-items: center; gap: 10px; padding: 5px 0; min-width: 0; width: 100%; font: 13px var(--sans); }
