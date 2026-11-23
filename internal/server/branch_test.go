@@ -70,6 +70,7 @@ func TestMergeAndDeleteBranch(t *testing.T) {
 		t.Errorf("merge-abort: %d %s", code, data)
 	}
 	_, data = e.do(t, "GET", "/api/status?repo="+id, nil, false)
+	st.Merging = false // поле с omitempty: при false его нет в JSON
 	if json.Unmarshal(data, &st) != nil || st.Merging {
 		t.Errorf("status after abort: %s", data)
 	}

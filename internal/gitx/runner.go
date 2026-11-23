@@ -119,5 +119,11 @@ func (r *Runner) RunEnv(ctx context.Context, dir string, env []string, args ...s
 // вывод fetch, pull, push, где git пишет прогресс в stderr).
 func (r *Runner) RunCombined(ctx context.Context, dir string, args ...string) (string, error) {
 	so, se, err := r.run(ctx, dir, nil, args)
-	return strings.TrimSpace(redact(so + se)), err
+	out := strings.TrimSpace(redact(so + se))
+	// часть команд (git merge: CONFLICT ...) пишет причину в stdout: она нужна и в ошибке
+	var ge *Error
+	if errors.As(err, &ge) && out != "" && ge.Code >= 0 {
+		ge.Output = out
+	}
+	return out, err
 }

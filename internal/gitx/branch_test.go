@@ -32,8 +32,8 @@ func TestMergeAndAbort(t *testing.T) {
 	mustGit(t, r, dir, "switch", "-q", "main")
 	writeFile(t, filepath.Join(dir, "README"), "main\n")
 	commitAll(t, r, dir, "main")
-	if _, err := r.Merge(ctx, dir, "other"); err == nil {
-		t.Fatal("conflicting merge must fail")
+	if _, err := r.Merge(ctx, dir, "other"); err == nil || !strings.Contains(err.Error(), "CONFLICT") {
+		t.Fatalf("conflicting merge must fail and say why: %v", err)
 	}
 	st, err := r.Status(ctx, dir)
 	if err != nil {
