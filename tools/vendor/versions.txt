@@ -1,0 +1,16 @@
+# Закреплённые версии библиотек интерфейса: репозиторий GitHub и тег.
+# Сборка: tools/vendor/build.sh (клонирует эти теги и собирает web/vendor/ через esbuild).
+codemirror/state 6.6.0
+codemirror/view 6.41.0
+codemirror/commands 6.10.3
+codemirror/language 6.12.3
+codemirror/search 6.6.0
+codemirror/legacy-modes 6.5.2
+lezer-parser/common 1.5.2
+lezer-parser/highlight 1.2.3
+lezer-parser/lr 1.4.2
+marijnh/style-mod 4.1.3
+marijnh/w3c-keyname 2.2.8
+marijnh/crelt 1.0.6
+marijnh/find-cluster-break 1.0.2
+xtermjs/xterm.js 6.0.0

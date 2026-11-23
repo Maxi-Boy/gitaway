@@ -18,6 +18,7 @@ import (
 	"github.com/Maxi-Boy/gitaway/internal/fsx"
 	"github.com/Maxi-Boy/gitaway/internal/gitx"
 	"github.com/Maxi-Boy/gitaway/internal/jobs"
+	"github.com/Maxi-Boy/gitaway/internal/session"
 	"github.com/Maxi-Boy/gitaway/internal/store"
 )
 
@@ -30,7 +31,8 @@ type Deps struct {
 	Settings *store.SettingsStore
 	Git      *gitx.Runner
 	Log      *slog.Logger
-	Web      fs.FS // статический интерфейс для "/" (может быть nil)
+	Web      fs.FS            // статический интерфейс для "/" (может быть nil)
+	Terms    *session.Manager // терминалы и другие процессы в pty (nil: новый менеджер)
 }
 
 // Server обслуживает API и статические файлы.
@@ -49,6 +51,7 @@ type Server struct {
 	commits  *gitx.CommitCache
 	allow    []netip.Prefix
 	allowAll bool
+	terms    *session.Manager
 }
 
 func New(d Deps) *Server {
@@ -61,6 +64,10 @@ func New(d Deps) *Server {
 		// Normalize уже проверил список; если всё же ошибка, пускаем только loopback
 		log.Error("allow_cidrs", "err", err)
 		allow = nil
+	}
+	terms := d.Terms
+	if terms == nil {
+		terms = session.NewManager()
 	}
 	return &Server{
 		cfg:      d.Cfg,
@@ -77,6 +84,7 @@ func New(d Deps) *Server {
 		commits:  gitx.NewCommitCache(),
 		allow:    allow,
 		allowAll: len(d.Cfg.AllowCIDRs) == 0,
+		terms:    terms,
 	}
 }
 
@@ -100,6 +108,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/fs/mkdir", s.api(s.handleMkdir))
 	mux.HandleFunc("/api/settings", s.api(s.handleSettings))
 	mux.HandleFunc("/api/diff", s.api(s.handleDiff))
+	mux.HandleFunc("/api/sessions", s.api(s.handleSessions))
+	mux.HandleFunc("/api/sessions/ws", s.api(s.handleSessionWS))
 	s.registerGit(mux)
 	s.registerChanges(mux)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {

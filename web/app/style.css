@@ -182,13 +182,27 @@ body:not(.fs-open) .right { display: none; }
 .diff .m { color: var(--muted); }
 
 /* нижняя панель */
-.dock { height: var(--dock-h); flex: none; border-top: 1px solid var(--line); background: var(--bg-deep); display: flex; flex-direction: column; }
+.dock { height: var(--dock-h); flex: none; border-top: 1px solid var(--line); background: var(--bg-deep); display: flex; flex-direction: column; position: relative; }
+.dock-grip { position: absolute; left: 0; right: 0; top: -4px; height: 8px; cursor: ns-resize; z-index: 2; touch-action: none; }
+.dock.collapsed .dock-grip { display: none; }
 .dock.collapsed { height: 32px; }
 .dock-tabs { height: 32px; flex: none; display: flex; align-items: center; gap: 4px; padding: 0 8px; background: var(--panel); }
 .dock-tabs .t { background: none; border: 0; padding: 4px 8px; border-radius: 4px; color: var(--muted); cursor: pointer; font-size: 12px; }
 .dock-tabs .t.on { color: var(--text); font-weight: 600; }
 .dock-body { flex: 1; min-height: 0; overflow: auto; font: 12.5px/1.55 var(--mono); padding: 8px 16px; }
 .dock.collapsed .dock-body { display: none; }
+.dock-body[hidden] { display: none; }
+.term-pane { padding: 0; display: flex; flex-direction: column; font: inherit; }
+.term-tabs { flex: none; display: flex; align-items: center; gap: 2px; padding: 4px 8px; border-bottom: 1px solid var(--line-soft); overflow-x: auto; }
+.term-tabs .t { display: inline-flex; gap: 6px; align-items: center; background: none; border: 0; padding: 3px 8px; border-radius: 4px; color: var(--muted); cursor: pointer; font: 12px var(--sans); white-space: nowrap; }
+.term-tabs .t.on { color: var(--text); background: var(--hover); }
+.term-tabs .x { padding: 0 2px; border-radius: 3px; }
+.term-tabs .x:hover { background: var(--ctl); color: var(--text); }
+.term-screens { flex: 1; min-height: 0; position: relative; }
+.term-screen { position: absolute; inset: 0; padding: 4px 0 0 8px; }
+.term-screen[hidden] { display: none; }
+.term-keys { flex: none; display: flex; gap: 6px; padding: 6px 8px; overflow-x: auto; border-top: 1px solid var(--line-soft); background: var(--panel); }
+.term-keys .btn { min-width: 40px; justify-content: center; padding: 6px 10px; }
 .log-entry { margin-bottom: 10px; }
 .log-entry .cmd { color: var(--muted); }
 .log-entry .cmd.bad { color: var(--bad); }

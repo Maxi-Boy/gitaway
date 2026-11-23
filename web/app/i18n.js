@@ -10,3 +10,11 @@ export function t(key, vars) {
   if (vars) s = s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m));
   return s;
 }
+
+// phrases('cm.') возвращает тексты с этим префиксом без префикса: для библиотек,
+// которые принимают свой словарь (CodeMirror: панель поиска, переход к строке).
+export function phrases(prefix) {
+  const out = {};
+  for (const [k, v] of Object.entries(dict)) if (k.startsWith(prefix)) out[k.slice(prefix.length)] = v;
+  return out;
+}

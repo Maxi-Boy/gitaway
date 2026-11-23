@@ -129,6 +129,7 @@ export function treeView(route) {
       !e.is_dir && changed ? { label: t('files.showDiff'), run: () => act.nav({ view: 'changes', path: join(dir, e.name) }) } : null,
       '-',
       { label: t('files.toServer'), run: () => copyToServer({ path: dir, items: names }) },
+      { label: t('term.inTab'), run: () => state.dock?.newTerminal() },
       changed ? { label: t('changes.stage'), run: () => act.stage(paths) } : null,
       changed ? { label: t('changes.discard') + '…', danger: true, run: () => act.discard(paths) } : null,
       '-',

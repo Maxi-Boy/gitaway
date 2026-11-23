@@ -135,6 +135,7 @@ export async function gitOp(op, body = {}, wt = state.wt) {
   } catch (err) {
     logResult(cmd, false, err.message);
     toast(t('git.failed', { op }) + ': ' + err.message, { bad: true });
+    err.shown = true;
     throw err;
   } finally {
     refreshAll();
@@ -237,6 +238,7 @@ async function changeOp(op, body, cmd) {
   } catch (err) {
     if (cmd) logResult(cmd, false, err.message);
     toast(err.message, { bad: true });
+    err.shown = true;
     throw err;
   }
 }

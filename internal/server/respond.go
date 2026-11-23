@@ -11,6 +11,7 @@ import (
 	"github.com/Maxi-Boy/gitaway/internal/copyop"
 	"github.com/Maxi-Boy/gitaway/internal/fsx"
 	"github.com/Maxi-Boy/gitaway/internal/gitx"
+	"github.com/Maxi-Boy/gitaway/internal/session"
 )
 
 const maxBody = 8 << 20 // 8 МБ: лимит тела запроса
@@ -58,6 +59,10 @@ func (s *Server) fail(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusBadRequest, "into_itself", "cannot copy a directory into itself")
 	case errors.Is(err, copyop.ErrInvalid):
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+	case errors.Is(err, session.ErrLimit):
+		writeError(w, http.StatusTooManyRequests, "too_many_sessions", "too many terminals are open; close one first")
+	case errors.Is(err, session.ErrNotFound):
+		writeError(w, http.StatusNotFound, "not_found", "session not found")
 	case errors.Is(err, context.Canceled):
 		// клиент оборвал запрос: отвечать некому
 	case errors.Is(err, fsx.ErrOutside):

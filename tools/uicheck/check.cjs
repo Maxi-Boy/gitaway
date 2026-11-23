@@ -107,15 +107,23 @@ require('fs').mkdirSync(OUT, { recursive: true });
   await step('file: edit, draft, save via Ctrl+S', async () => {
     await page.click('.seg button:has-text("Файлы")');
     await page.dblclick('.center .row:has-text("README.md")');
-    await page.waitForSelector('textarea.editor');
-    await page.click('textarea.editor');
-    await page.keyboard.press('End');
+    await page.waitForSelector('.cm-content');
+    await page.click('.cm-content');
+    await page.keyboard.press('Control+End');
     await page.keyboard.type('Новая строка');
     await page.waitForSelector('.dirty');
     await page.keyboard.press('Control+s');
     await page.waitForSelector('.toast:has-text("Сохранено")');
   });
+  await step('editor: search panel in Russian', async () => {
+    await page.click('.cm-content');
+    await page.keyboard.press('Control+f');
+    await page.waitForSelector('.cm-search input[placeholder="Найти"]');
+    await page.keyboard.type('myrepo');
+    await page.waitForSelector('.cm-searchMatch');
+  });
   await page.screenshot({ path: OUT + '/6-editor.png' });
+  await page.keyboard.press('Escape');
 
   await step('palette', async () => {
     await page.keyboard.press('Control+k');
@@ -130,9 +138,29 @@ require('fs').mkdirSync(OUT, { recursive: true });
 
   await step('reload keeps route', async () => {
     await page.goto(URL + '#/repo/r1/wt/feature%2Flogin/file/server.go:3');
-    await page.waitForSelector('textarea.editor');
-    const sel = await page.$eval('textarea.editor', (a) => a.value.slice(a.selectionStart, a.selectionEnd));
-    if (!sel.includes('func main')) throw new Error('line not selected: ' + JSON.stringify(sel));
+    await page.waitForSelector('.cm-activeLine');
+    const line = await page.$eval('.cm-activeLine', (a) => a.textContent);
+    if (!line.includes('func main')) throw new Error('line 3 not active: ' + JSON.stringify(line));
+  });
+
+  await step('terminal: open, type, reconnect after reload', async () => {
+    await page.keyboard.press('Control+Backquote');
+    await page.waitForSelector('.term-screen:not([hidden]) .xterm');
+    await page.waitForFunction(() => document.querySelector('.term-screen:not([hidden]) .xterm-rows')?.textContent.includes('sysadmin@nvme-lab'));
+    await page.keyboard.type('pwd');
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(() => document.querySelector('.term-screen:not([hidden]) .xterm-rows').textContent.includes('/home/sysadmin/projects/myrepo'));
+  });
+  await page.screenshot({ path: OUT + '/12-terminal.png' });
+  await step('terminal: Ctrl+K goes to the shell, not the palette', async () => {
+    await page.keyboard.press('Control+k');
+    await page.waitForTimeout(200);
+    if (await page.$('.palette')) throw new Error('palette opened inside terminal');
+  });
+  await step('terminal survives reload', async () => {
+    await page.reload();
+    await page.waitForSelector('.dock-tabs .t.on:has-text("Терминал")');
+    await page.waitForFunction(() => document.querySelector('.term-screen:not([hidden]) .xterm-rows')?.textContent.includes('/home/sysadmin/projects/myrepo'));
   });
 
   // телефон
@@ -156,9 +184,10 @@ require('fs').mkdirSync(OUT, { recursive: true });
     await mp.waitForSelector('.right .row:has-text("README.md")');
   });
   await mp.screenshot({ path: OUT + '/10-mobile-server.png' });
-  await step('mobile: output pane', async () => {
-    await mp.click('.mnav button:has-text("Вывод")');
-    await mp.waitForSelector('.dock-body');
+  await step('mobile: terminal pane with extra keys', async () => {
+    await mp.click('.mnav button:has-text("Терминал")');
+    await mp.waitForSelector('.term-screen:not([hidden]) .xterm');
+    await mp.waitForSelector('.term-keys button:has-text("Esc")');
   });
   await mp.screenshot({ path: OUT + '/11-mobile-out.png' });
 

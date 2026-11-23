@@ -6,7 +6,7 @@ import { t } from './i18n.js';
 const registry = new Map();
 const recent = [];
 
-// register({id, title, keys: 'Ctrl+S', run, when: () => bool, palette: true})
+// register({id, title, keys: 'Ctrl+S', run, when: () => bool, palette: true, inTerminal: false})
 export function register(cmd) {
   registry.set(cmd.id, { palette: true, ...cmd });
 }
@@ -29,7 +29,7 @@ export async function run(id, ...args) {
   try {
     await c.run(...args);
   } catch (err) {
-    toast(err.message || String(err), { bad: true });
+    if (!err.shown) toast(err.message || String(err), { bad: true }); // действие могло уже показать ошибку
   }
 }
 
@@ -42,14 +42,18 @@ function keyOf(e) {
   if (e.shiftKey) parts.push('Shift');
   let k = e.key.length === 1 ? e.key.toUpperCase() : e.key;
   if (e.code?.startsWith('Key')) k = e.code.slice(3); // одинаково в любой раскладке
+  if (e.code === 'Backquote') k = '`';
   parts.push(k);
   return parts.join('+');
 }
 
 addEventListener('keydown', (e) => {
   if (document.querySelector('.overlay')) return; // в открытом диалоге свои клавиши
+  // в терминале Ctrl+K, Ctrl+J, Ctrl+S и другие нужны оболочке: работают только команды с inTerminal
+  const inTerm = !!e.target.closest?.('.term-screen');
   const k = keyOf(e);
   for (const c of registry.values()) {
+    if (inTerm && !c.inTerminal) continue;
     if (c.keys && c.keys.split(' ').includes(k) && (!c.when || c.when())) {
       e.preventDefault();
       run(c.id);

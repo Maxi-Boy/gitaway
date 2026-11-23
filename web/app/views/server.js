@@ -109,6 +109,7 @@ export function serverPanel(el) {
     if (e.is_dir) dropTarget(r, () => ({ dir: full, path: '' }));
     onContext(r, () => [
       e.is_dir ? { label: t('files.openFolder'), run: () => go(full) } : null,
+      e.is_dir ? { label: t('term.here'), run: () => state.dock?.newTerminal({ dir: full }) } : null,
       { label: t('path.copy'), run: () => copyText(full) },
     ]);
     return r;

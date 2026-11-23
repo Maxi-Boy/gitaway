@@ -2,6 +2,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 
 const WEB = process.argv[2];
 const PORT = Number(process.argv[3] || 8451);
@@ -71,6 +72,35 @@ const fsDirs = {
   ],
   [ROOT + '/export/docs']: [],
 };
+
+// сеансы терминала: эхо-оболочка, вывод копится для переподключения
+const sessions = [];
+const PROMPT = '\x1b[32msysadmin@nvme-lab\x1b[0m:\x1b[34m~/myrepo\x1b[0m$ ';
+
+function wsFrame(op, data) {
+  const len = data.length;
+  const head = len < 126 ? Buffer.from([0x80 | op, len]) : Buffer.from([0x80 | op, 126, len >> 8, len & 255]);
+  return Buffer.concat([head, data]);
+}
+
+function wsParse(buf) {
+  const out = [];
+  let i = 0;
+  while (buf.length - i >= 6) {
+    const op = buf[i] & 15;
+    let len = buf[i + 1] & 127;
+    let p = i + 2;
+    if (len === 126) { len = buf.readUInt16BE(p); p += 2; }
+    const mask = buf.subarray(p, p + 4);
+    p += 4;
+    if (buf.length < p + len) break;
+    const data = Buffer.from(buf.subarray(p, p + len));
+    for (let k = 0; k < len; k++) data[k] ^= mask[k % 4];
+    out.push({ op, data });
+    i = p + len;
+  }
+  return { frames: out, rest: buf.subarray(i) };
+}
 
 function json(res, code, v) {
   res.writeHead(code, { 'Content-Type': 'application/json' });
@@ -169,7 +199,14 @@ http.createServer(async (req, res) => {
       }
       return json(res, 200, res2);
     }
-    case '/api/worktrees/add': return json(res, 201, {});
+    case '/api/sessions':
+      if (req.method === 'POST') {
+        const info = { id: 's' + (sessions.length + 1), title: b.repo ? 'feature-login' : 'export', dir: b.dir || ROOT + '/myrepo', running: true, exit_code: 0, buf: PROMPT, line: '' };
+        sessions.push(info);
+        return json(res, 201, info);
+      }
+      if (req.method === 'DELETE') { const i = sessions.findIndex((x) => x.id === q.id); if (i < 0) return err(res, 404, 'not_found', 'session not found'); sessions.splice(i, 1); return json(res, 200, { ok: true }); }
+      return json(res, 200, sessions.map(({ buf, line, ...x }) => x));
   }
   if (p.startsWith('/api/git/')) {
     const op = p.slice(9);
@@ -182,4 +219,30 @@ http.createServer(async (req, res) => {
     return json(res, 200, { output: op === 'fetch' ? 'From github.com:Maxi-Boy/myrepo\n   1a2b3c..4d5e6f  main -> origin/main' : 'Already up to date.' });
   }
   err(res, 404, 'not_found', 'unknown API endpoint');
+}).on('upgrade', (req, sock) => {
+  const u = new URL(req.url, 'http://x');
+  const sess = sessions.find((x) => x.id === u.searchParams.get('id'));
+  if (!sess || !req.headers.origin) { sock.end('HTTP/1.1 403 Forbidden\r\n\r\n'); return; }
+  const accept = crypto.createHash('sha1').update(req.headers['sec-websocket-key'] + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
+  sock.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ' + accept + '\r\n\r\n');
+  const out = (text) => { sess.buf += text; sock.write(wsFrame(2, Buffer.from(text))); };
+  sock.write(wsFrame(2, Buffer.from(sess.buf)));
+  let pending = Buffer.alloc(0);
+  sock.on('data', (chunk) => {
+    const { frames, rest } = wsParse(Buffer.concat([pending, chunk]));
+    pending = rest;
+    for (const f of frames) {
+      if (f.op === 8) { sock.end(); return; }
+      if (f.op !== 2) continue; // текстовые кадры: resize
+      for (const ch of f.data.toString()) {
+        if (ch === '\r') {
+          const cmd = sess.line.trim();
+          sess.line = '';
+          out('\r\n' + (cmd === 'pwd' ? sess.dir : cmd ? 'mock: ' + cmd : '') + (cmd ? '\r\n' : '') + PROMPT);
+        } else if (ch === '\x7f') { if (sess.line) { sess.line = sess.line.slice(0, -1); out('\b \b'); } }
+        else { sess.line += ch; out(ch); }
+      }
+    }
+  });
+  sock.on('error', () => {});
 }).listen(PORT, '127.0.0.1');

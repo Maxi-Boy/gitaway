@@ -97,7 +97,7 @@ function buildShell() {
 function setPane(id) {
   state.pane = id;
   if (id === 'right' && !state.fsOpen) setFs(true);
-  if (id === 'out') state.dock?.show('output');
+  if (id === 'out') state.dock?.show('terminal');
   emit('pane');
 }
 
@@ -131,6 +131,11 @@ function registerCommands() {
   register({ id: 'view.changes', title: t('cmd.changes'), keys: 'Ctrl+Shift+G', when: hasWt, run: () => act.nav({ view: 'changes', path: '' }) });
   register({ id: 'file.save', title: t('file.save'), keys: 'Ctrl+S', when: () => !!currentEditor(), run: () => currentEditor().save() });
   register({ id: 'dock.output', title: t('cmd.output'), keys: 'Ctrl+J', run: () => state.dock?.show('output') });
+  register({ id: 'term.new', title: t('term.new'), keys: 'Ctrl+`', inTerminal: true, run: () => {
+    if (innerWidth < 900) setPane('out');
+    return state.dock?.newTerminal();
+  } });
+  register({ id: 'term.show', title: t('cmd.terminal'), run: () => state.dock?.show('terminal') });
   register({ id: 'tab.next', title: t('cmd.nextTab'), keys: 'Alt+PageDown', when: () => state.worktrees.length > 1, run: () => cycleTab(1) });
   register({ id: 'tab.prev', title: t('cmd.prevTab'), keys: 'Alt+PageUp', when: () => state.worktrees.length > 1, run: () => cycleTab(-1) });
   register({ id: 'logout', title: t('auth.logout'), run: async () => {

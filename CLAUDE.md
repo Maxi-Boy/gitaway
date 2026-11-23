@@ -38,12 +38,14 @@ CI (`.github/workflows/ci.yml`) на каждый push: build, vet, test -race, 
     internal/store/    repos.json и settings.json (0600, атомарная запись)
     internal/jobs/     KeyedLock: одна операция на репозиторий или каталог
     internal/copyop/   копирование между панелями: план -> решения -> атомарная запись
+    internal/session/  процессы в pty (терминал, позже задачи): буфер вывода, переподключение
     internal/server/   HTTP API, middleware, обработчики
     web/               интерфейс через go:embed: index.html и ES-модули в web/app/
                        (main, actions, store, router, commands, ui, i18n/ru.js, views/)
     proto/             прототипы PAM, терминала, замера (отдельный модуль, CI не собирает)
     packaging/         systemd-юнит gitaway@.service, пример nginx
     tools/uicheck/     заглушка API и сценарий Playwright: проверка интерфейса без Go
+    tools/vendor/      сборка web/vendor/ (CodeMirror, xterm.js) из закреплённых тегов GitHub
 
 ## Правила (не нарушать без явного решения пользователя)
 

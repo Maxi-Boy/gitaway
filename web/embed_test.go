@@ -8,7 +8,8 @@ import (
 
 // Интерфейс вшивается в бинарник: страница, стили и все модули на месте.
 func TestEmbeddedFiles(t *testing.T) {
-	for _, name := range []string{"index.html", "app/main.js", "app/style.css", "app/i18n/ru.js", "app/views/center.js"} {
+	for _, name := range []string{"index.html", "app/main.js", "app/style.css", "app/i18n/ru.js", "app/views/center.js",
+		"vendor/codemirror.js", "vendor/xterm.js", "vendor/xterm.css", "vendor/LICENSES.txt"} {
 		if _, err := fs.Stat(FS, name); err != nil {
 			t.Errorf("%s is not embedded: %v", name, err)
 		}
