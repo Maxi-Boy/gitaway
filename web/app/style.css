@@ -111,7 +111,7 @@ a { color: var(--link); }
 .btn.icon { padding: 4px 6px; }
 .btn svg { width: 16px; height: 16px; }
 .link-btn { background: none; border: 0; color: var(--link); cursor: pointer; padding: 0; }
-input[type=text], input[type=password], textarea {
+input[type=text], input[type=search], input[type=password], textarea {
   background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px;
 }
 input:focus-visible, textarea:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
@@ -424,6 +424,10 @@ mark { background: var(--mark-bg); color: inherit; border-radius: 2px; }
   .history.picked .list, .history:not(.picked) .commit-pane { display: none; }
   .narrow-only { display: inline-flex; }
   .center > .bar .seg button { padding: 4px 7px; }
+  /* крошки пути отдельной строкой: рядом с переключателем и кнопками им не хватает места */
+  .center > .bar { flex-wrap: wrap; height: auto; min-height: 40px; row-gap: 4px; padding-top: 6px; padding-bottom: 6px; }
+  .center > .bar .bar-crumbs { order: 10; flex-basis: 100%; }
+  .center > .bar > .grow:not(.bar-crumbs) { display: none; }
   .cmp { grid-template-columns: 84px minmax(0, 1fr) minmax(0, 1fr); font-size: 12px; }
   .mnav { display: flex; flex: none; height: 52px; border-top: 1px solid var(--line); background: var(--panel); }
   .mnav button { flex: 1; background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 12px; }

@@ -40,7 +40,7 @@ export function center(el) {
         t('changes.title'), n ? ' ' + n : ''),
       h('button', { class: r.view === 'history' ? 'on' : null, role: 'tab', onclick: () => run('view.history') }, t('history.title')));
     mount(bar, seg,
-      files ? h('div', { class: 'grow', style: { display: 'flex', minWidth: '0' } }, crumbs(r.path, r.view === 'file')) : h('span', { class: 'grow' }),
+      files ? h('div', { class: 'grow bar-crumbs', style: { display: 'flex', minWidth: '0' } }, crumbs(r.path, r.view === 'file')) : h('span', { class: 'grow' }),
       view?.actions || null,
       h('button', {
         class: 'btn icon' + (r.view === 'search' ? ' on' : ''), title: t('search.title') + ' (Ctrl+Shift+F)', 'aria-label': t('search.title'),
